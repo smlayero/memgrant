@@ -4,6 +4,14 @@
   "private": true,
   "description": "Self-hosted, user-held, E2EE cross-agent memory with cryptographic per-agent grants",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/smlum666/cross-agent-memory.git"
+  },
+  "homepage": "https://github.com/smlum666/cross-agent-memory",
+  "bugs": {
+    "url": "https://github.com/smlum666/cross-agent-memory/issues"
+  },
   "type": "module",
   "workspaces": [
     "packages/sdk-core",

@@ -1,7 +1,9 @@
-# memory-backbone
+# cross-agent-memory
 
 用户自持密钥、端到端加密、按 Agent 密码学授权的跨 Agent 记忆组件。
 同步服务由你自己部署。本仓库不运营托管云、不计费。
+
+npm 工作区名仍为 `memory-backbone`（`@memory-backbone/*`）。
 
 [VISION](VISION.md) · [SECURITY](SECURITY.md) · [自托管](docs/self-host.md)
 
