@@ -55,6 +55,7 @@
     <div class="toolbar">
       <input id="q" placeholder="搜索记忆…" onkeydown="if(event.key==='Enter')loadMemories()">
       <button class="btn primary" onclick="loadMemories()">搜索</button>
+      <button class="btn" onclick="pullSync()">从云端拉同步</button>
     </div>
     <table><thead><tr><th>内容</th><th>类型</th><th>级别</th><th>来源</th><th>更新时间</th><th></th></tr></thead><tbody id="memBody"></tbody></table>
     <p class="muted" id="memCount"></p>
@@ -96,6 +97,16 @@ async function loadMemories() {
     </tr>`).join("");
   $("memCount").textContent = `共 ${r.total} 条`;
 }
+async function pullSync() {
+  const r = await fetch("/api/sync/pull", { method: "POST" });
+  const body = await r.json();
+  if (!r.ok) {
+    alert(body.error ?? "同步失败");
+    return;
+  }
+  await loadMemories();
+  alert(`已拉取：写入 ${body.applied ?? 0}，删除 ${body.deleted ?? 0}`);
+}
 async function delMemory(id) {
   if (!confirm("删除后云端密文与全部授权凭据一并销毁，确认？")) return;
   await fetch("/api/memories/" + encodeURIComponent(id), { method: "DELETE" });
@@ -133,7 +144,8 @@ async function loadKeys() {
     <dt>安全存储后端</dt><dd>${esc(r.backend)}</dd>
     <dt>主密钥状态</dt><dd>${r.initialized ? "已初始化" : "未初始化（需先运行 setup/恢复）"}</dd>
     <dt>本机 Agent 身份</dt><dd>${esc(r.agentId ?? "—")}</dd>
-    <dt>云端端点</dt><dd>${esc(r.endpoint ?? "—")}</dd>`;
+    <dt>云端端点</dt><dd>${esc(r.endpoint ?? "—")}</dd>
+    <dt>判断引擎</dt><dd>${esc(r.judge?.engine ?? "l0")}${r.judge?.model ? " · " + esc(r.judge.model) : ""}</dd>`;
   $("keyBadge").textContent = `${r.backend} · ${r.initialized ? "密钥就绪" : "未初始化"}`;
 }
 

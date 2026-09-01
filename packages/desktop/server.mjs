@@ -13,9 +13,7 @@ import os from "node:os";
 import { promises as fs } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-const sdk = await import(
-  new URL("../sdk-core/dist/index.js", import.meta.url).href
-);
+const sdk = await import("@memory-backbone/sdk-core");
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.MB_DESKTOP_PORT ?? 4787);
@@ -141,13 +139,60 @@ export function createServer() {
         const q = url.searchParams.get("q");
         let items;
         if (q) {
-          items = store.searchMemories(q, 100);
+          const config = await loadConfigFile();
+          const embedder = sdk.createEmbedderFromConfig(config.embedder);
+          let vec = null;
+          try {
+            vec = await embedder.embed(q);
+          } catch {
+            vec = null;
+          }
+          items = store.searchHybrid(q, vec, 100).map((h) => h.memory);
         } else {
           items = store.listMemories(500);
         }
         const count = store.countMemories();
         store.close();
         return json(res, { total: count, items });
+      }
+
+      if (url.pathname === "/api/sync/pull" && req.method === "POST") {
+        let config;
+        try {
+          config = await requireCloud();
+        } catch (e) {
+          return json(res, { error: e.message }, e.status ?? 401);
+        }
+        const home = mbHome();
+        const store = await sdk.LocalStore.open(path.join(home, "cache.db"));
+        const kc = sdk.createBestKeychain(home);
+        const deviceSk = await sdk.loadDeviceSk(home);
+        const service = new sdk.MemoryService(
+          kc,
+          store,
+          () => [],
+          sdk.createEmbedderFromConfig(config.embedder),
+          sdk.createJudgeFromConfig(config.judge),
+        );
+        const sync = new sdk.SyncClient({
+          endpoint: String(config.endpoint).replace(/\/$/, ""),
+          ...(config.device_token ? { token: config.device_token } : {}),
+          ...(config.device_id && deviceSk
+            ? { deviceId: config.device_id, deviceSk }
+            : {}),
+        });
+        try {
+          const result = await sync.pullAndApply(store, (id, body) =>
+            service.applyFetched(id, body),
+          );
+          await store.persist();
+          await audit("sync.pull", result);
+          return json(res, { ok: true, ...result });
+        } catch (e) {
+          return json(res, { error: String(e.message ?? e) }, 502);
+        } finally {
+          store.close();
+        }
       }
 
       // —— 删除记忆 ——

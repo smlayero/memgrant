@@ -56,6 +56,10 @@ beforeAll(async () => {
       res.end(JSON.stringify({ items: [] }));
       return;
     }
+    if ((req.url ?? "").includes("/sync/changes")) {
+      res.end(JSON.stringify({ changes: [], cursor: "0" }));
+      return;
+    }
     res.end(JSON.stringify({ ok: true, accepted: 0 }));
   });
   await new Promise((resolve) => cloud.listen(0, "127.0.0.1", resolve));
@@ -131,6 +135,13 @@ describe("桌面管理 API", () => {
     expect(r.body).toHaveProperty("backend");
     expect(r.body).toHaveProperty("initialized");
     expect(JSON.stringify(r.body)).not.toMatch(/[0-9a-f]{64}/);
+  });
+
+  it("从云端拉同步", async () => {
+    const r = await api("/api/sync/pull", { method: "POST" });
+    expect(r.status).toBe(200);
+    expect(r.body.ok).toBe(true);
+    expect(r.body.applied).toBe(0);
   });
 
   it("非法掩码被拒绝", async () => {

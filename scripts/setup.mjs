@@ -23,6 +23,7 @@ const bundle = sdk.generateMnemonicBundle();
 const deviceKeys = sdk.generateAgentKeyPair();
 const kc = sdk.createBestKeychain(home);
 await kc.setMk(bundle.mk);
+await sdk.saveDeviceSk(home, deviceKeys.secretKey);
 
 const verifier = sdk.recoveryVerifier(bundle.mk);
 const res = await fetch(`${endpoint}/api/auth/register`, {
@@ -61,10 +62,13 @@ console.log("已写入", path.join(home, "config.json"));
 console.log("user_id:", body.user_id);
 console.log("Keychain:", kc.id);
 console.log("");
-console.log("助记词（只显示一次，请离线抄写）：");
+console.log("助记词（只显示一次，请离线抄写；这是恢复主密钥的唯一主路径）：");
 console.log(bundle.mnemonic);
 console.log("");
-console.log("下一步：配置 MCP 指向 packages/mcp-server/dist/index.js，或 npm run desktop");
+console.log("配对码（SPAKE2）只是多设备便利手段，未做第三方协议审计；丢设备请用上面的助记词 recover。");
+console.log("");
+console.log("下一步：npm run clients  （写入 Cursor MCP + Claude Code hooks）");
+console.log("或 npm run desktop");
 
 bundle.mk.fill(0);
 deviceKeys.secretKey.fill(0);

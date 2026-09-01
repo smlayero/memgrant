@@ -56,7 +56,7 @@ async function main() {
     keychain,
     store,
     () => [],
-    undefined,
+    sdk.createEmbedderFromConfig(config.embedder),
     sdk.createJudgeFromConfig(config.judge),
   );
 

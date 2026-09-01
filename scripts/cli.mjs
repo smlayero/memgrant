@@ -85,6 +85,7 @@ async function cmdJoin(code) {
   const cred = await joiner.receiveDeviceCred();
   const kc = sdk.createBestKeychain(mbHome());
   await kc.setMk(mk);
+  await sdk.saveDeviceSk(mbHome(), keys.secretKey);
   await writeConfig({
     endpoint,
     user_id: cred.userId,
@@ -122,6 +123,7 @@ async function cmdRecover(userId, mnemonic) {
   const body = await res.json();
   const kc = sdk.createBestKeychain(mbHome());
   await kc.setMk(mk);
+  await sdk.saveDeviceSk(mbHome(), keys.secretKey);
   await writeConfig({
     endpoint,
     user_id: body.user_id,

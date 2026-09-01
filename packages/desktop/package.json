@@ -3,13 +3,20 @@
   "version": "0.1.0",
   "license": "Apache-2.0",
   "type": "module",
-  "description": "桌面管理 App：记忆列表 / 权限管理 / 密钥管理 / 审计查看（本地 Web UI，127.0.0.1 绑定）",
+  "description": "Local 127.0.0.1 console for memories, grants, keys, and audit",
   "bin": {
     "memory-backbone-desktop": "./server.mjs"
+  },
+  "files": ["server.mjs", "public"],
+  "publishConfig": {
+    "access": "public"
   },
   "scripts": {
     "start": "node server.mjs",
     "test": "vitest run"
+  },
+  "dependencies": {
+    "@memory-backbone/sdk-core": "0.1.0"
   },
   "devDependencies": {
     "vitest": "^2.1.8"

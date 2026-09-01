@@ -7,8 +7,15 @@
   "bin": {
     "memory-backbone-setup": "./claude-code/setup.mjs"
   },
+  "files": ["claude-code"],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "test": "vitest run"
+  },
+  "dependencies": {
+    "@memory-backbone/sdk-core": "0.1.0"
   },
   "devDependencies": {
     "vitest": "^2.1.8"

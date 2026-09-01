@@ -7,6 +7,7 @@
  */
 import { Hono } from "hono";
 import { SyncHub } from "./syncHub.js";
+import { parseMb1Header, verifyMb1, b64ToBytes } from "./mb1.js";
 
 export { SyncHub };
 
@@ -71,13 +72,57 @@ async function recordChange(
   await broadcast(env, userId, { memoryId, op, ts: Date.now() });
 }
 
-// ---------- 认证（MVP 简化：设备 token；Phase 2 换公钥签名挑战） ----------
+// ---------- 认证：MB1 设备签名优先，Bearer device_token 仍可用（WS / 旧配置） ----------
 
 async function auth(
-  c: { req: { header: (n: string) => string | undefined }; env: Env },
+  c: {
+    req: {
+      header: (n: string) => string | undefined;
+      method: string;
+      path: string;
+    };
+    env: Env;
+  },
 ): Promise<{ userId: string; deviceId: string } | null> {
   const header = c.req.header("authorization");
-  if (!header?.startsWith("Bearer ")) return null;
+  if (!header) return null;
+
+  if (header.startsWith("MB1 ")) {
+    const parsed = parseMb1Header(header);
+    if (!parsed) return null;
+    const ts = Number(parsed.ts);
+    if (!Number.isFinite(ts) || Math.abs(Date.now() - ts) > 90_000) return null;
+    const chal = await c.env.SESSIONS.get(
+      `chal:${parsed.deviceId}:${parsed.nonce}`,
+    );
+    if (!chal) return null;
+    const row = await c.env.DB.prepare(
+      `SELECT device_id, user_id, device_pubkey FROM devices
+       WHERE device_id = ? AND revoked_at IS NULL`,
+    )
+      .bind(parsed.deviceId)
+      .first<{ device_id: string; user_id: string; device_pubkey: string }>();
+    if (!row?.device_pubkey) return null;
+    let pub: Uint8Array;
+    try {
+      pub = b64ToBytes(row.device_pubkey);
+    } catch {
+      return null;
+    }
+    const ok = verifyMb1(
+      parsed.deviceId,
+      parsed.nonce,
+      parsed.ts,
+      c.req.method,
+      c.req.path,
+      pub,
+      parsed.signature,
+    );
+    if (!ok) return null;
+    return { userId: row.user_id, deviceId: row.device_id };
+  }
+
+  if (!header.startsWith("Bearer ")) return null;
   const token = header.slice(7);
   const row = await c.env.DB.prepare(
     `SELECT device_id, user_id FROM devices WHERE device_token = ? AND revoked_at IS NULL`,
@@ -99,6 +144,22 @@ app.use("/api/*", async (c, next) => {
 });
 
 // ---------- 注册 / 恢复 ----------
+
+app.post("/api/auth/challenge", async (c) => {
+  const body = await c.req.json<{ device_id?: string }>();
+  if (!body.device_id) return c.json({ error: "device_id required" }, 400);
+  const row = await c.env.DB.prepare(
+    `SELECT device_id FROM devices WHERE device_id = ? AND revoked_at IS NULL`,
+  )
+    .bind(body.device_id)
+    .first<{ device_id: string }>();
+  if (!row) return c.json({ error: "unknown device" }, 404);
+  const nonce = randomId(16);
+  await c.env.SESSIONS.put(`chal:${body.device_id}:${nonce}`, "1", {
+    expirationTtl: 90,
+  });
+  return c.json({ nonce, ttl: 90 });
+});
 
 app.post("/api/auth/register", async (c) => {
   const body = await c.req.json<{

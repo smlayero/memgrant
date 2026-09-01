@@ -84,15 +84,26 @@ MCP (Claude Code, Cursor, and others):
 }
 ```
 
-Desktop console: `npm run desktop` (binds only `127.0.0.1`).
+Desktop console: `npm run desktop` (binds only `127.0.0.1`). Use **Pull from cloud** to apply ciphertext from your sync node onto this device.
 
-Extra devices: run `node scripts/cli.mjs pair` on an existing device, then `node scripts/cli.mjs join <code>` on the new one.
+Extra devices: **preferred** — `node scripts/cli.mjs recover <user_id> "<mnemonic>"` on the new machine.
 
-Mnemonic recover: `node scripts/cli.mjs recover <user_id> "<mnemonic>"`.
+Pairing codes (`pair` / `join`) are a convenience. SPAKE2 has not had a third-party protocol audit.
 
-Deploy to your own Cloudflare account: [docs/self-host.md](docs/self-host.md).
+Deploy to your own Cloudflare account: [docs/self-host.md](docs/self-host.md) or `npm run deploy:cf`.
+
+One-shot client install (Cursor MCP + Claude Code hooks):
+
+```bash
+npm run build
+npm run clients
+```
+
+Then reload MCP in Cursor.
 
 ## Optional local model for judging
+
+Default judging is local regex rules (L0). You can optionally point at a **local** OpenAI-compatible endpoint (Ollama, LM Studio, llama.cpp) to decide what is worth storing and at what sensitivity. The mnemonic still derives the master key and **cannot** be replaced by a model.
 
 Default judging is local regex rules (L0). You can optionally point at a **local** OpenAI-compatible endpoint (Ollama, LM Studio, llama.cpp) to decide what is worth storing and at what sensitivity. The mnemonic still derives the master key and **cannot** be replaced by a model.
 
@@ -111,6 +122,21 @@ L0 always runs first as a safety floor: credentials stay level 4 even if the mod
 
 The local model process sees the plaintext being classified. The sync node still sees ciphertext only. Pointing `baseUrl` at a remote API sends that plaintext off-device—don't do that unless you accept that.
 
+Optional local embeddings (same `/v1` style) for hybrid search:
+
+```json
+"embedder": {
+  "l1": {
+    "baseUrl": "http://127.0.0.1:11434/v1",
+    "model": "nomic-embed-text"
+  }
+}
+```
+
+Without this, search still works: keyword match plus a local hash embedder (not a semantic model).
+
+HTTP APIs prefer **MB1** device signatures (`POST /api/auth/challenge` then signed headers). `device_token` remains for WebSocket and older clients.
+
 ## Acceptance tests
 
 | Gate | What it checks |
@@ -126,6 +152,17 @@ The local model process sees the plaintext being classified. The sync node still
 ```bash
 node scripts/e2e-selfhost.mjs    # write on A, read on B
 node scripts/revoke-demo.mjs     # revoke → 404
+```
+
+## npm packages
+
+After `npm login`, publish from the monorepo (cloud stays private / self-hosted):
+
+```bash
+npm publish -w @memory-backbone/sdk-core --access public
+npm publish -w @memory-backbone/mcp-server --access public
+npm publish -w @memory-backbone/adapters --access public
+npm publish -w @memory-backbone/desktop --access public
 ```
 
 ## License

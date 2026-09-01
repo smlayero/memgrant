@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS devices (
   device_name TEXT,
   device_type TEXT,
   device_pubkey TEXT,                  -- 设备长期公钥（认证用）
-  device_token TEXT NOT NULL,          -- 设备访问令牌（MVP 简化认证，Phase 2 换签名挑战）
+  device_token TEXT NOT NULL,          -- WebSocket / 旧 Bearer；HTTP 优先 MB1 签名
   paired_via TEXT,                     -- 'mnemonic' | 'pake'
   last_seen TEXT,
   revoked_at TEXT

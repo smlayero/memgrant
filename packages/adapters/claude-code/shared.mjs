@@ -1,13 +1,11 @@
 /**
  * Claude Code 适配器共享模块：配置加载、存储打开、权限过滤。
- * 所有 hook 脚本为纯 .mjs（免构建），经相对 URL 引入 sdk-core 产物。
  */
 import path from "node:path";
 import { promises as fs } from "node:fs";
 import os from "node:os";
 
-const sdkCoreUrl = new URL("../../sdk-core/dist/index.js", import.meta.url);
-const sdk = await import(sdkCoreUrl.href);
+const sdk = await import("@memory-backbone/sdk-core");
 
 export function mbHome() {
   return process.env.MB_HOME ?? path.join(os.homedir(), ".memory-backbone");
@@ -28,7 +26,7 @@ export async function loadAgentMask(agentId) {
     const me = agents.find((a) => a.agentId === agentId && a.status === "active");
     return me?.permissionMask ?? 2;
   } catch {
-    return 2; // 未配对默认 Level 2（不含敏感记忆）
+    return 2;
   }
 }
 

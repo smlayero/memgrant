@@ -4,6 +4,7 @@
  */
 import { composeJudge, rulesJudge, type Judge } from "./compose.js";
 import { createOpenAiCompatJudge } from "./openaiCompat.js";
+import { warnIfRemoteModelUrl } from "./localUrl.js";
 
 export interface JudgeL1Config {
   baseUrl: string;
@@ -19,6 +20,7 @@ export function createJudgeFromConfig(config?: JudgeConfig | null): Judge {
   const baseUrl = config?.l1?.baseUrl?.trim();
   const model = config?.l1?.model?.trim();
   if (!baseUrl || !model) return rulesJudge;
+  warnIfRemoteModelUrl("judge", baseUrl);
   const l1 = createOpenAiCompatJudge({
     baseUrl,
     model,

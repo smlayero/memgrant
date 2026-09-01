@@ -21,7 +21,7 @@ import type { Keychain } from "../crypto/keychain.js";
 import type { LocalStore, LocalMemory } from "../cache/localStore.js";
 import { type JudgeInput, type JudgeResult } from "../judge/rules.js";
 import { rulesJudge, type Judge } from "../judge/compose.js";
-import type { Embedder } from "../judge/embedder.js";
+import { HashEmbedder, type Embedder } from "../judge/embedder.js";
 
 export interface SaveMemoryInput extends JudgeInput {
   memoryId?: string;
@@ -55,14 +55,16 @@ export interface MemorySyncPayload {
 
 export class MemoryService {
   private readonly judgeFn: Judge;
+  private readonly embedder: Embedder;
 
   constructor(
     private readonly keychain: Keychain,
     private readonly store: LocalStore,
     private readonly agents: () => AgentAccess[],
-    private readonly embedder?: Embedder,
+    embedder?: Embedder,
     judge?: Judge,
   ) {
+    this.embedder = embedder ?? new HashEmbedder();
     this.judgeFn = judge ?? rulesJudge;
   }
 
@@ -109,10 +111,7 @@ export class MemoryService {
         updatedAt: now,
         deleted: false,
       };
-      this.store.putMemory(
-        local,
-        this.embedder ? await this.embedder.embed(input.text) : undefined,
-      );
+      this.store.putMemory(local, await this.embedder.embed(input.text));
 
       // 离线队列：只放密文载荷（验收 S6：任何持久化载体零明文事故面最小化）
       const payload: MemorySyncPayload = {
@@ -209,18 +208,21 @@ export class MemoryService {
   ): Promise<void> {
     const text = await this.decryptAsUser(fetched.ciphertext, fetched.wrapped_dek);
     const now = fetched.updated_at ?? new Date().toISOString();
-    this.store.putMemory({
-      memoryId,
-      plaintext: text,
-      type: fetched.type ?? "event",
-      tags: fetched.tags ?? [],
-      permissionLevel: fetched.permission_level ?? 2,
-      importance: fetched.importance ?? 0.5,
-      sourceAgent: fetched.source_agent ?? null,
-      createdAt: fetched.created_at ?? now,
-      updatedAt: now,
-      deleted: false,
-    });
+    this.store.putMemory(
+      {
+        memoryId,
+        plaintext: text,
+        type: fetched.type ?? "event",
+        tags: fetched.tags ?? [],
+        permissionLevel: fetched.permission_level ?? 2,
+        importance: fetched.importance ?? 0.5,
+        sourceAgent: fetched.source_agent ?? null,
+        createdAt: fetched.created_at ?? now,
+        updatedAt: now,
+        deleted: false,
+      },
+      await this.embedder.embed(text),
+    );
   }
 
   private async requireMk(): Promise<Uint8Array> {

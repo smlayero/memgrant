@@ -84,13 +84,22 @@ MCP（Claude Code / Cursor 等）：
 }
 ```
 
-管理台：`npm run desktop`（仅绑定 127.0.0.1）。
+管理台：`npm run desktop`（仅绑定 127.0.0.1）。点 **从云端拉同步** 会把节点上的密文解开写进本机缓存。
 
-多设备：已有设备上 `node scripts/cli.mjs pair`，新设备 `node scripts/cli.mjs join <code>`。
+多设备**主路径**：在新机器上 `node scripts/cli.mjs recover <user_id> "<mnemonic>"`。
 
-助记词恢复：`node scripts/cli.mjs recover <user_id> "<mnemonic>"`。
+6 位配对码（`pair` / `join`）只是便利手段。SPAKE2 未经第三方协议审计。
 
-部署到自己的 Cloudflare 账号见 [docs/self-host.md](docs/self-host.md)。
+部署到自己的 Cloudflare 账号见 [docs/self-host.md](docs/self-host.md)，或 `npm run deploy:cf`。
+
+一键写入 Cursor MCP 与 Claude Code hooks：
+
+```bash
+npm run build
+npm run clients
+```
+
+然后在 Cursor 里重载 MCP。
 
 ## 可选：用本机模型做判断
 
@@ -111,6 +120,21 @@ L0 始终先跑，作为安全地板：凭证类仍是 4 级，模型不能降�
 
 本机模型进程会看到正在分类的明文。同步节点仍然只见密文。把 `baseUrl` 指到远程 API 等于让明文离机——除非你接受这一点，否则不要这样做。
 
+可选本机向量（同一套 `/v1`）做混合检索：
+
+```json
+"embedder": {
+  "l1": {
+    "baseUrl": "http://127.0.0.1:11434/v1",
+    "model": "nomic-embed-text"
+  }
+}
+```
+
+不配时仍可搜：关键词 + 本地哈希向量（不是语义模型）。
+
+HTTP 优先用 **MB1** 设备签名（先 `POST /api/auth/challenge`）。`device_token` 留给 WebSocket 和旧客户端。
+
 ## 验收测试
 
 | 门禁 | 内容 |
@@ -126,6 +150,17 @@ L0 始终先跑，作为安全地板：凭证类仍是 4 级，模型不能降�
 ```bash
 node scripts/e2e-selfhost.mjs    # 双设备写入→对端可读
 node scripts/revoke-demo.mjs     # 撤销后 Agent 读取 404
+```
+
+## npm 包
+
+本机 `npm login` 之后可发布（cloud 保持 private，自己部署）：
+
+```bash
+npm publish -w @memory-backbone/sdk-core --access public
+npm publish -w @memory-backbone/mcp-server --access public
+npm publish -w @memory-backbone/adapters --access public
+npm publish -w @memory-backbone/desktop --access public
 ```
 
 ## 许可证

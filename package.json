@@ -26,6 +26,8 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "dev:cloud": "npm run dev --workspace @memory-backbone/cloud",
     "setup": "node scripts/setup.mjs",
+    "clients": "node scripts/install-clients.mjs",
+    "deploy:cf": "node scripts/deploy-cloudflare.mjs",
     "desktop": "npm start --workspace @memory-backbone/desktop",
     "e2e": "node scripts/e2e-selfhost.mjs",
     "revoke-demo": "node scripts/revoke-demo.mjs"

@@ -101,6 +101,42 @@ describe("Health & Auth", () => {
     }, env as never);
     expect(res.status).toBe(401);
   });
+
+  it("MB1 设备签名可通过；错签 401", async () => {
+    const { secp256k1 } = await import("@noble/curves/secp256k1");
+    const { sha256 } = await import("@noble/hashes/sha256");
+    const sk = secp256k1.utils.randomPrivateKey();
+    const pk = secp256k1.getPublicKey(sk, true);
+    const pubB64 = btoa(String.fromCharCode(...pk));
+    const reg = await app.request("/api/auth/register", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        fixed_salt: "aabbccdd11223344",
+        device_pubkey: pubB64,
+      }),
+    }, env as never);
+    const cred = (await reg.json()) as { device_id: string };
+    const chal = await app.request("/api/auth/challenge", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ device_id: cred.device_id }),
+    }, env as never);
+    const { nonce } = (await chal.json()) as { nonce: string };
+    const ts = String(Date.now());
+    const canonical = ["MB1", cred.device_id, nonce, ts, "GET", "/api/memories/keys"].join("\n");
+    const hash = sha256(new TextEncoder().encode(canonical));
+    const sig = secp256k1.sign(hash, sk).toCompactRawBytes();
+    const sigB64 = btoa(String.fromCharCode(...sig));
+    const ok = await app.request("/api/memories/keys", {
+      headers: { authorization: `MB1 ${cred.device_id} ${ts} ${nonce} ${sigB64}` },
+    }, env as never);
+    expect(ok.status).toBe(200);
+    const bad = await app.request("/api/memories/keys", {
+      headers: { authorization: `MB1 ${cred.device_id} ${ts} ${nonce} ${btoa("nope")}` },
+    }, env as never);
+    expect(bad.status).toBe(401);
+  });
 });
 
 describe("Memory sync · grants 服务端校验", () => {

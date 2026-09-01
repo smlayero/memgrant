@@ -17,11 +17,14 @@ import path from "node:path";
 import {
   createBestKeychain,
   createJudgeFromConfig,
+  createEmbedderFromConfig,
+  loadDeviceSk,
   LocalStore,
   MemoryService,
   SyncClient,
   type AgentAccess,
   type JudgeConfig,
+  type EmbedderConfig,
 } from "@memory-backbone/sdk-core";
 
 interface Config {
@@ -30,6 +33,8 @@ interface Config {
   agent_id: string;
   cache: { dir: string };
   judge?: JudgeConfig;
+  embedder?: EmbedderConfig;
+  device_id?: string;
 }
 
 async function loadConfig(): Promise<Config> {
@@ -49,6 +54,8 @@ async function loadConfig(): Promise<Config> {
   };
   if (parsed.device_token) config.device_token = parsed.device_token;
   if (parsed.judge) config.judge = parsed.judge as JudgeConfig;
+  if (parsed.embedder) config.embedder = parsed.embedder as EmbedderConfig;
+  if (parsed.device_id) config.device_id = parsed.device_id;
   return config;
 }
 
@@ -81,16 +88,24 @@ async function main(): Promise<void> {
     // 尚无配对 Agent：保存仍可用（用户路径），仅不生成 grants
   }
 
+  const deviceSk = await loadDeviceSk(config.cache.dir);
   const service = new MemoryService(
     keychain,
     store,
     () => agents,
-    undefined,
+    createEmbedderFromConfig(config.embedder),
     createJudgeFromConfig(config.judge),
   );
-  const sync = config.device_token
-    ? new SyncClient({ endpoint: config.endpoint, token: config.device_token })
-    : null;
+  const sync =
+    config.device_token || (config.device_id && deviceSk)
+      ? new SyncClient({
+          endpoint: config.endpoint,
+          ...(config.device_token ? { token: config.device_token } : {}),
+          ...(config.device_id && deviceSk
+            ? { deviceId: config.device_id, deviceSk }
+            : {}),
+        })
+      : null;
 
   const server = new McpServer({
     name: "memory-backbone",
@@ -151,7 +166,17 @@ async function main(): Promise<void> {
       const limit = typeof args.limit === "number" ? args.limit : 10;
       const me = agents.find((a) => a.agentId === config.agent_id && a.status === "active");
       const mask = me?.permissionMask ?? 2;
-      const hits = store.searchMemories(query, limit).filter((h) => h.permissionLevel <= mask);
+      const embedder = createEmbedderFromConfig(config.embedder);
+      let vec = null;
+      try {
+        vec = await embedder.embed(query);
+      } catch {
+        vec = null;
+      }
+      const hits = store
+        .searchHybrid(query, vec, limit)
+        .map((h) => h.memory)
+        .filter((h) => h.permissionLevel <= mask);
       if (hits.length === 0) {
         return { content: [{ type: "text" as const, text: "无匹配记忆" }] };
       }

@@ -66,7 +66,15 @@ docker compose up --build
 
 ## 多设备
 
-已有设备：
+**主路径（推荐）：** 旧设备丢失或新电脑，用助记词恢复主密钥：
+
+```bash
+node scripts/cli.mjs recover <user_id> "word1 word2 ... word24"
+```
+
+`user_id` 在首设备 `config.json` 里。恢复证明是 MK 的哈希，MK 本身不上网。
+
+**便利路径：** 已有设备还在、只是再加一台：
 
 ```bash
 node scripts/cli.mjs pair
@@ -78,10 +86,4 @@ node scripts/cli.mjs pair
 node scripts/cli.mjs join 123456
 ```
 
-旧设备丢失、只剩助记词：
-
-```bash
-node scripts/cli.mjs recover <user_id> "word1 word2 ... word24"
-```
-
-`user_id` 在首设备 `config.json` 里。恢复证明是 MK 的哈希，MK 本身不上网。
+SPAKE2 未经第三方协议审计；不要把它当成比助记词更可信的主路径。
