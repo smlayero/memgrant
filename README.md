@@ -92,6 +92,25 @@ Mnemonic recover: `node scripts/cli.mjs recover <user_id> "<mnemonic>"`.
 
 Deploy to your own Cloudflare account: [docs/self-host.md](docs/self-host.md).
 
+## Optional local model for judging
+
+Default judging is local regex rules (L0). You can optionally point at a **local** OpenAI-compatible endpoint (Ollama, LM Studio, llama.cpp) to decide what is worth storing and at what sensitivity. The mnemonic still derives the master key and **cannot** be replaced by a model.
+
+Add to `~/.memory-backbone/config.json`:
+
+```json
+"judge": {
+  "l1": {
+    "baseUrl": "http://127.0.0.1:11434/v1",
+    "model": "qwen2.5:7b"
+  }
+}
+```
+
+L0 always runs first as a safety floor: credentials stay level 4 even if the model says otherwise. If the model is down or slow, judging falls back to L0. No model is required to use this repo.
+
+The local model process sees the plaintext being classified. The sync node still sees ciphertext only. Pointing `baseUrl` at a remote API sends that plaintext off-device—don't do that unless you accept that.
+
 ## Acceptance tests
 
 | Gate | What it checks |

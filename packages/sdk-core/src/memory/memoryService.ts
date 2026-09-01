@@ -19,12 +19,8 @@ import {
 } from "../crypto/grants.js";
 import type { Keychain } from "../crypto/keychain.js";
 import type { LocalStore, LocalMemory } from "../cache/localStore.js";
-import {
-  judgeByRules,
-  type JudgeInput,
-  type JudgeResult,
-  L0_ENGINE_VERSION,
-} from "../judge/rules.js";
+import { type JudgeInput, type JudgeResult } from "../judge/rules.js";
+import { rulesJudge, type Judge } from "../judge/compose.js";
 import type { Embedder } from "../judge/embedder.js";
 
 export interface SaveMemoryInput extends JudgeInput {
@@ -58,16 +54,21 @@ export interface MemorySyncPayload {
 }
 
 export class MemoryService {
+  private readonly judgeFn: Judge;
+
   constructor(
     private readonly keychain: Keychain,
     private readonly store: LocalStore,
     private readonly agents: () => AgentAccess[],
     private readonly embedder?: Embedder,
-  ) {}
+    judge?: Judge,
+  ) {
+    this.judgeFn = judge ?? rulesJudge;
+  }
 
   /** 写入主链路。 */
   async saveMemory(input: SaveMemoryInput): Promise<SaveMemoryResult> {
-    const judge = judgeByRules(input);
+    const judge = await this.judgeFn(input);
     const memoryId =
       input.memoryId ?? toBase64(randomBytes(16)).replace(/[/+=]/g, "");
     if (!judge.shouldStore) {
@@ -123,7 +124,7 @@ export class MemoryService {
         tags: judge.tags,
         permission_level: judge.permissionLevel,
         importance: judge.importance,
-        judge_model_version: L0_ENGINE_VERSION,
+        judge_model_version: judge.engineVersion,
         size_bytes: sealed.sealed.length,
         grants,
         updated_at: now,

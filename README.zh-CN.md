@@ -92,6 +92,25 @@ MCP（Claude Code / Cursor 等）：
 
 部署到自己的 Cloudflare 账号见 [docs/self-host.md](docs/self-host.md)。
 
+## 可选：用本机模型做判断
+
+默认判断是本地正则规则（L0）。你可以额外接 **本机** OpenAI 兼容接口（Ollama、LM Studio、llama.cpp），用来决定该不该存、敏感级别。助记词仍然只用来派生主密钥，**不能**用模型替换。
+
+在 `~/.memory-backbone/config.json` 里加上：
+
+```json
+"judge": {
+  "l1": {
+    "baseUrl": "http://127.0.0.1:11434/v1",
+    "model": "qwen2.5:7b"
+  }
+}
+```
+
+L0 始终先跑，作为安全地板：凭证类仍是 4 级，模型不能降级。模型挂掉或超时则退回纯 L0。不装模型也能用本仓库。
+
+本机模型进程会看到正在分类的明文。同步节点仍然只见密文。把 `baseUrl` 指到远程 API 等于让明文离机——除非你接受这一点，否则不要这样做。
+
 ## 验收测试
 
 | 门禁 | 内容 |

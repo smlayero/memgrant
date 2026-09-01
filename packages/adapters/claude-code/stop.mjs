@@ -52,7 +52,13 @@ async function main() {
   const config = await loadConfig();
   const store = await openStore();
   const keychain = sdk.FileKeychain.default(mbHome());
-  const service = new sdk.MemoryService(keychain, store, () => []);
+  const service = new sdk.MemoryService(
+    keychain,
+    store,
+    () => [],
+    undefined,
+    sdk.createJudgeFromConfig(config.judge),
+  );
 
   const messages = await extractUserMessages(transcriptPath);
   let saved = 0;

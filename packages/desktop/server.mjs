@@ -242,6 +242,13 @@ export function createServer() {
           initialized: mk !== null,
           agentId: config.agent_id ?? null,
           endpoint: config.endpoint ?? null,
+          judge: config.judge?.l1?.baseUrl && config.judge?.l1?.model
+            ? {
+                engine: "l0+l1",
+                model: config.judge.l1.model,
+                baseUrl: config.judge.l1.baseUrl,
+              }
+            : { engine: "l0" },
         });
       }
 

@@ -3,7 +3,7 @@
  * 记忆骨干 MCP Server（方案 §6.1 mcp-server/，Phase 1 显式接入阶段）。
  *
  * 对任何 MCP 客户端（Claude Code / Cursor / 113+ 客户端）暴露三个工具：
- *   save_memory     显式保存（L0 规则判断，明文不出设备）
+ *   save_memory     显式保存（L0 规则 + 可选本机 L1，明文不出设备）
  *   search_memories 本地缓存检索（本地优先，断网可用）
  *   delete_memory   删除（本地标记 + 云端删密文/grants）
  *
@@ -16,10 +16,12 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import {
   createBestKeychain,
+  createJudgeFromConfig,
   LocalStore,
   MemoryService,
   SyncClient,
   type AgentAccess,
+  type JudgeConfig,
 } from "@memory-backbone/sdk-core";
 
 interface Config {
@@ -27,6 +29,7 @@ interface Config {
   device_token?: string;
   agent_id: string;
   cache: { dir: string };
+  judge?: JudgeConfig;
 }
 
 async function loadConfig(): Promise<Config> {
@@ -45,6 +48,7 @@ async function loadConfig(): Promise<Config> {
     cache: { dir: parsed.cache?.dir ?? dir },
   };
   if (parsed.device_token) config.device_token = parsed.device_token;
+  if (parsed.judge) config.judge = parsed.judge as JudgeConfig;
   return config;
 }
 
@@ -77,7 +81,13 @@ async function main(): Promise<void> {
     // 尚无配对 Agent：保存仍可用（用户路径），仅不生成 grants
   }
 
-  const service = new MemoryService(keychain, store, () => agents);
+  const service = new MemoryService(
+    keychain,
+    store,
+    () => agents,
+    undefined,
+    createJudgeFromConfig(config.judge),
+  );
   const sync = config.device_token
     ? new SyncClient({ endpoint: config.endpoint, token: config.device_token })
     : null;
