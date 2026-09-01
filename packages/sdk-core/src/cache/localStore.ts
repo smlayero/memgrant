@@ -315,7 +315,7 @@ export class LocalStore {
     this.db.run(
       `INSERT INTO outbox (op, memory_id, payload, attempts, next_retry_at, created_at)
        VALUES (?, ?, ?, 0, 0, ?)`,
-      [row[0], row[1], row[2], row[3]],
+      [String(row[0]), String(row[1]), String(row[2]), Number(row[3])],
     );
     this.db.run(`DELETE FROM dead_letter WHERE id = ?`, [id]);
   }

@@ -2,19 +2,25 @@
   "name": "memory-backbone",
   "version": "0.1.0",
   "private": true,
-  "description": "Cross-agent memory backbone: user-held, E2EE, cryptographic per-agent permissioning",
-  "license": "AGPL-3.0-only",
+  "description": "Self-hosted, user-held, E2EE cross-agent memory with cryptographic per-agent grants",
+  "license": "Apache-2.0",
   "type": "module",
   "workspaces": [
     "packages/sdk-core",
     "packages/cloud",
     "packages/mcp-server",
-    "packages/adapters"
+    "packages/adapters",
+    "packages/desktop"
   ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
-    "typecheck": "npm run typecheck --workspaces --if-present"
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "dev:cloud": "npm run dev --workspace @memory-backbone/cloud",
+    "setup": "node scripts/setup.mjs",
+    "desktop": "npm start --workspace @memory-backbone/desktop",
+    "e2e": "node scripts/e2e-selfhost.mjs",
+    "revoke-demo": "node scripts/revoke-demo.mjs"
   },
   "engines": {
     "node": ">=22.0.0"

@@ -15,7 +15,9 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: npm run build
       - run: npm run typecheck
       - run: npm test
-      - run: npm run build
       - run: node scripts/smoke.mjs
+      - run: node scripts/e2e-selfhost.mjs
+      - run: node scripts/revoke-demo.mjs

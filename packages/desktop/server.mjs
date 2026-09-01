@@ -38,6 +38,75 @@ async function writeJson(file, data) {
   await fs.writeFile(file, JSON.stringify(data, null, 2));
 }
 
+async function loadConfigFile() {
+  return readJson(path.join(mbHome(), "config.json"), {});
+}
+
+async function requireCloud() {
+  const config = await loadConfigFile();
+  if (!config.endpoint || !config.device_token) {
+    const err = new Error("需要 endpoint 与 device_token，拒绝只改本地状态假装撤销/改权");
+    err.status = 401;
+    throw err;
+  }
+  return config;
+}
+
+async function cloudFetch(config, pathname, init = {}) {
+  const res = await fetch(`${String(config.endpoint).replace(/\/$/, "")}${pathname}`, {
+    ...init,
+    headers: {
+      authorization: `Bearer ${config.device_token}`,
+      "content-type": "application/json",
+      ...(init.headers ?? {}),
+    },
+  });
+  return res;
+}
+
+async function rebuildGrants(config, agent) {
+  const keysRes = await cloudFetch(config, "/api/memories/keys");
+  if (!keysRes.ok) return { rebuilt: 0, error: `keys HTTP ${keysRes.status}` };
+  const { items } = await keysRes.json();
+  const kc = sdk.createBestKeychain(mbHome());
+  const mk = await kc.getMk();
+  if (!mk) return { rebuilt: 0, error: "MK unavailable" };
+  const pub = Uint8Array.from(atob(agent.agentPublicKeyB64 ?? "AA=="), (ch) => ch.charCodeAt(0));
+  const grants = [];
+  for (const item of items ?? []) {
+    if (item.permission_level > agent.permissionMask) continue;
+    const dek = await sdk.unwrapDekWithMk(mk, sdk.fromBase64(item.wrapped_dek));
+    try {
+      const g = await sdk.createGrant(
+        {
+          agentId: agent.agentId,
+          agentPublicKey: pub,
+          permissionMask: agent.permissionMask,
+          status: "active",
+        },
+        { memoryId: item.memory_id, dek, permissionLevel: item.permission_level },
+      );
+      if (g) {
+        grants.push({
+          grant_id: g.grantId,
+          agent_id: g.agentId,
+          memory_id: g.memoryId,
+          enc_dek: g.encDekB64,
+        });
+      }
+    } finally {
+      dek.fill(0);
+    }
+  }
+  const syncRes = await cloudFetch(config, "/api/grants/sync", {
+    method: "POST",
+    body: JSON.stringify({ grants }),
+  });
+  if (!syncRes.ok) return { rebuilt: 0, error: `grants HTTP ${syncRes.status}` };
+  const body = await syncRes.json();
+  return { rebuilt: body.accepted ?? grants.length };
+}
+
 async function audit(action, detail) {
   const line = JSON.stringify({ ts: new Date().toISOString(), action, detail }) + "\n";
   await fs.mkdir(mbHome(), { recursive: true });
@@ -103,27 +172,55 @@ export function createServer() {
         return json(res, { items: agents });
       }
 
-      // —— 调整权限掩码（触发该 Agent grants 重算 → 由下次同步批量任务执行） ——
+      // —— 调整权限掩码：必须打到自托管节点，禁止只改本地 json ——
       const maskMatch = url.pathname.match(/^\/api\/agents\/([^/]+)\/mask$/);
       if (maskMatch && req.method === "POST") {
         const { mask } = await readBody(req);
         if (typeof mask !== "number" || mask < 0 || mask > 4) {
           return json(res, { error: "mask must be 0-4" }, 400);
         }
+        let config;
+        try {
+          config = await requireCloud();
+        } catch (e) {
+          return json(res, { error: e.message }, e.status ?? 401);
+        }
+        const cloudRes = await cloudFetch(config, `/api/permissions/update/${encodeURIComponent(maskMatch[1])}`, {
+          method: "PUT",
+          body: JSON.stringify({ permission_mask: mask }),
+        });
+        if (!cloudRes.ok) {
+          return json(res, { error: `cloud update failed: HTTP ${cloudRes.status}` }, 502);
+        }
         const file = path.join(mbHome(), "paired-agents.json");
         const agents = await readJson(file, []);
         const agent = agents.find((a) => a.agentId === maskMatch[1]);
         if (!agent) return json(res, { error: "agent not found" }, 404);
         agent.permissionMask = mask;
-        agent.grantsStale = true; // 标记需重算（方案 §4.3 步骤 6）
+        const rebuilt = await rebuildGrants(config, agent);
+        agent.grantsStale = Boolean(rebuilt.error);
         await writeJson(file, agents);
-        await audit("agent.mask.update", { agentId: agent.agentId, mask });
-        return json(res, { ok: true, grantsStale: true });
+        await audit("agent.mask.update", { agentId: agent.agentId, mask, rebuilt });
+        return json(res, { ok: true, grantsStale: agent.grantsStale, rebuilt });
       }
 
-      // —— 撤销 Agent（本地状态 + 云端删除 grants 由同步执行） ——
+      // —— 撤销 Agent：必须先删云端 grants ——
       const revokeMatch = url.pathname.match(/^\/api\/agents\/([^/]+)\/revoke$/);
       if (revokeMatch && req.method === "POST") {
+        let config;
+        try {
+          config = await requireCloud();
+        } catch (e) {
+          return json(res, { error: e.message }, e.status ?? 401);
+        }
+        const cloudRes = await cloudFetch(
+          config,
+          `/api/permissions/revoke/${encodeURIComponent(revokeMatch[1])}`,
+          { method: "DELETE" },
+        );
+        if (!cloudRes.ok) {
+          return json(res, { error: `cloud revoke failed: HTTP ${cloudRes.status}` }, 502);
+        }
         const file = path.join(mbHome(), "paired-agents.json");
         const agents = await readJson(file, []);
         const agent = agents.find((a) => a.agentId === revokeMatch[1]);
@@ -137,7 +234,7 @@ export function createServer() {
 
       // —— 密钥状态（不暴露任何密钥材料，只报状态） ——
       if (url.pathname === "/api/key-status" && req.method === "GET") {
-        const kc = sdk.createPlatformKeychain();
+        const kc = sdk.createBestKeychain(mbHome());
         const mk = await kc.getMk();
         const config = await readJson(path.join(mbHome(), "config.json"), {});
         return json(res, {
@@ -162,7 +259,7 @@ export function createServer() {
 
       json(res, { error: "not found" }, 404);
     } catch (err) {
-      json(res, { error: String(err?.message ?? err) }, 500);
+      json(res, { error: String(err?.message ?? err) }, err.status ?? 500);
     }
   });
 }

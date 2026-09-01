@@ -22,7 +22,9 @@ export interface PairingMessage {
     | "conf-a"
     | "conf-b"
     | "mk-transfer"
-    | "agent-pubkey";
+    | "agent-pubkey"
+    | "device-pubkey"
+    | "device-cred";
   body: string; // base64
 }
 
@@ -36,9 +38,8 @@ export interface PairingChannel {
 
 export function generatePairingCode(): string {
   const buf = randomBytes(4);
-  const n =
-    ((buf[0]! << 24) | (buf[1]! << 16) | (buf[2]! << 8) | buf[3]!) % 1_000_000;
-  return n.toString().padStart(6, "0");
+  const n = ((buf[0]! << 24) >>> 0) + ((buf[1]! << 16) | (buf[2]! << 8) | buf[3]!);
+  return (n % 1_000_000).toString().padStart(6, "0");
 }
 
 const PAIRING_AAD = "memory-backbone/pairing/v1";
@@ -161,6 +162,30 @@ export class PairingInitiator {
     );
   }
 
+  async receiveDevicePubkey(): Promise<Uint8Array> {
+    const msgs = await this.waitFor("device-pubkey");
+    return openWithSessionKey(
+      this.session.getSharedKey(),
+      fromBase64(msgs.body),
+    );
+  }
+
+  async sendDeviceCred(cred: {
+    userId: string;
+    deviceId: string;
+    deviceToken: string;
+  }): Promise<void> {
+    const sealed = await sealWithSessionKey(
+      this.session.getSharedKey(),
+      new TextEncoder().encode(JSON.stringify(cred)),
+    );
+    await this.channel.post(this.code, {
+      from: "A",
+      type: "device-cred",
+      body: toBase64(sealed),
+    });
+  }
+
   getSasFingerprint(): string {
     return this.session.getSasFingerprint();
   }
@@ -173,7 +198,10 @@ export class PairingInitiator {
     let index = 0;
     while (Date.now() < deadline) {
       const msgs = await this.channel.poll(this.code, index);
-      if (msgs === null) throw new Error("pairing session expired");
+      if (msgs === null) {
+        await new Promise((r) => setTimeout(r, 250));
+        continue;
+      }
       index += msgs.length;
       const hit = msgs.find((m) => m.type === type);
       if (hit) return hit;
@@ -249,6 +277,32 @@ export class PairingJoiner {
     return this.agentKeys;
   }
 
+  async sendDevicePubkey(publicKey: Uint8Array): Promise<void> {
+    const sealed = await sealWithSessionKey(this.session.getSharedKey(), publicKey);
+    await this.channel.post(this.code, {
+      from: "B",
+      type: "device-pubkey",
+      body: toBase64(sealed),
+    });
+  }
+
+  async receiveDeviceCred(): Promise<{
+    userId: string;
+    deviceId: string;
+    deviceToken: string;
+  }> {
+    const msg = await this.waitFor("device-cred");
+    const raw = await openWithSessionKey(
+      this.session.getSharedKey(),
+      fromBase64(msg.body),
+    );
+    return JSON.parse(new TextDecoder().decode(raw)) as {
+      userId: string;
+      deviceId: string;
+      deviceToken: string;
+    };
+  }
+
   getSasFingerprint(): string {
     return this.session.getSasFingerprint();
   }
@@ -261,7 +315,10 @@ export class PairingJoiner {
     let index = 0;
     while (Date.now() < deadline) {
       const msgs = await this.channel.poll(this.code, index);
-      if (msgs === null) throw new Error("pairing session expired");
+      if (msgs === null) {
+        await new Promise((r) => setTimeout(r, 250));
+        continue;
+      }
       index += msgs.length;
       const hit = msgs.find((m) => m.type === type);
       if (hit) return hit;

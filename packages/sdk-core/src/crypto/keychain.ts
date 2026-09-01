@@ -1,11 +1,9 @@
 /**
- * Keychain 抽象（方案 §6.1 crypto/Keychain 抽象 macOS/Windows/Linux）。
+ * Keychain 抽象。
  *
- * MK 存平台安全存储，永不以明文触碰网络：
- * - macOS：Keychain（security CLI / Keychain Services）—— TODO M1
- * - Windows：DPAPI（CryptProtectData）—— TODO M1
- * - Linux：libsecret —— TODO M1
- * 当前提供测试用内存实现与开发用文件实现（权限 0600）。
+ * MK 存平台安全存储，永不以明文触碰网络。
+ * 生产路径：createBestKeychain()（DPAPI / macOS Keychain / libsecret，失败则 0600 文件并警告）。
+ * 本文件提供测试用内存实现与文件兜底。
  */
 import { promises as fs } from "node:fs";
 import path from "node:path";

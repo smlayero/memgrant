@@ -204,6 +204,62 @@ export function createPlatformKeychain(dir?: string): Keychain {
   }
 }
 
+/**
+ * 生产默认：平台 Keychain，失败或读不到则 0600 文件兜底。
+ * 文件路径会在首次降级时警告一次。
+ */
+export function createBestKeychain(dir?: string): Keychain {
+  const platform = createPlatformKeychain(dir);
+  if (platform.id === "file") return platform;
+  return new FallbackKeychain(platform, FileKeychain.default(dir));
+}
+
+class FallbackKeychain implements Keychain {
+  private warned = false;
+
+  constructor(
+    private readonly primary: Keychain,
+    private readonly fallback: Keychain,
+  ) {}
+
+  get id(): string {
+    return `${this.primary.id}+file-fallback`;
+  }
+
+  async getMk(): Promise<Uint8Array | null> {
+    try {
+      const mk = await this.primary.getMk();
+      if (mk) return mk;
+    } catch {
+      this.warn();
+    }
+    return this.fallback.getMk();
+  }
+
+  async setMk(mk: Uint8Array): Promise<void> {
+    try {
+      await this.primary.setMk(mk);
+      return;
+    } catch {
+      this.warn();
+      await this.fallback.setMk(mk);
+    }
+  }
+
+  async deleteMk(): Promise<void> {
+    await this.primary.deleteMk().catch(() => undefined);
+    await this.fallback.deleteMk().catch(() => undefined);
+  }
+
+  private warn(): void {
+    if (this.warned) return;
+    this.warned = true;
+    console.warn(
+      "[memory-backbone] 平台 Keychain 不可用，MK 降级写入 0600 文件。见 SECURITY.md",
+    );
+  }
+}
+
 /** 平台后端可用性自检（用于 setup 流程提示）。 */
 export async function probePlatformKeychain(): Promise<{
   backend: string;

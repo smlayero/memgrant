@@ -12,7 +12,7 @@ import { generateMnemonic, validateMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english";
 import { pbkdf2 } from "@noble/hashes/pbkdf2";
 import { sha256 } from "@noble/hashes/sha256";
-import { randomBytes, utf8ToBytes, toHex, fromHex } from "./random.js";
+import { randomBytes, utf8ToBytes, toHex, fromHex, concatBytes } from "./random.js";
 
 export const MK_BYTES = 32;
 export const FIXED_SALT_BYTES = 16;
@@ -53,4 +53,11 @@ export function deriveMkFromMnemonic(
     c: PBKDF2_ITERATIONS,
     dkLen: MK_BYTES,
   });
+}
+
+const RECOVERY_DOMAIN = "memory-backbone/recover/v1";
+
+/** 助记词恢复证明：云端只存哈希，永不上传 MK。 */
+export function recoveryVerifier(mk: Uint8Array): string {
+  return toHex(sha256(concatBytes(utf8ToBytes(RECOVERY_DOMAIN), mk)));
 }

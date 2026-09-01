@@ -15,7 +15,7 @@ import { z } from "zod";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import {
-  FileKeychain,
+  createBestKeychain,
   LocalStore,
   MemoryService,
   SyncClient,
@@ -31,7 +31,9 @@ interface Config {
 
 async function loadConfig(): Promise<Config> {
   const home = process.env.HOME ?? process.env.USERPROFILE ?? ".";
-  const configPath = path.join(home, ".memory-backbone", "config.json");
+  const dir =
+    process.env.MB_HOME ?? path.join(home, ".memory-backbone");
+  const configPath = path.join(dir, "config.json");
   const raw = await fs.readFile(configPath, "utf8");
   const parsed = JSON.parse(raw) as Partial<Config>;
   if (!parsed.endpoint || !parsed.agent_id) {
@@ -40,7 +42,7 @@ async function loadConfig(): Promise<Config> {
   const config: Config = {
     endpoint: parsed.endpoint.replace(/\/$/, ""),
     agent_id: parsed.agent_id,
-    cache: { dir: parsed.cache?.dir ?? path.join(home, ".memory-backbone") },
+    cache: { dir: parsed.cache?.dir ?? dir },
   };
   if (parsed.device_token) config.device_token = parsed.device_token;
   return config;
@@ -48,7 +50,7 @@ async function loadConfig(): Promise<Config> {
 
 async function main(): Promise<void> {
   const config = await loadConfig();
-  const keychain = FileKeychain.default();
+  const keychain = createBestKeychain(config.cache.dir);
   const store = await LocalStore.open(path.join(config.cache.dir, "cache.db"));
   // Phase 1：MCP 侧是"用户设备"角色，Agent 授权列表由桌面 App/配对流程维护；
   // 本进程启动时从本地缓存目录读取已配对 Agent（paired-agents.json，由配对流程写入）。
@@ -137,7 +139,9 @@ async function main(): Promise<void> {
     async (args) => {
       const query = String(args.query);
       const limit = typeof args.limit === "number" ? args.limit : 10;
-      const hits = store.searchMemories(query, limit);
+      const me = agents.find((a) => a.agentId === config.agent_id && a.status === "active");
+      const mask = me?.permissionMask ?? 2;
+      const hits = store.searchMemories(query, limit).filter((h) => h.permissionLevel <= mask);
       if (hits.length === 0) {
         return { content: [{ type: "text" as const, text: "无匹配记忆" }] };
       }

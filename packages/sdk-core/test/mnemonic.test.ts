@@ -7,6 +7,7 @@ import {
   generateMnemonicBundle,
   deriveMkFromMnemonic,
   PBKDF2_ITERATIONS,
+  recoveryVerifier,
 } from "../src/crypto/mnemonic.js";
 import { toHex } from "../src/crypto/random.js";
 
@@ -46,5 +47,14 @@ describe("S1: 双设备助记词派生一致性", () => {
 
   it(`PBKDF2 迭代次数符合方案（${PBKDF2_ITERATIONS}）`, () => {
     expect(PBKDF2_ITERATIONS).toBe(600_000);
+  });
+
+  it("recoveryVerifier 对同一 MK 稳定且不泄露 MK 本身", () => {
+    const a = generateMnemonicBundle();
+    const v1 = recoveryVerifier(a.mk);
+    const v2 = recoveryVerifier(a.mk);
+    expect(v1).toBe(v2);
+    expect(v1).toMatch(/^[0-9a-f]{64}$/);
+    expect(v1).not.toBe(toHex(a.mk));
   });
 });

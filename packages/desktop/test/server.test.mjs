@@ -5,10 +5,12 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import os from "node:os";
+import http from "node:http";
 import { fileURLToPath } from "node:url";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 let server;
+let cloud;
 let base;
 let home;
 
@@ -48,13 +50,34 @@ beforeAll(async () => {
     ]),
   );
 
+  cloud = http.createServer((req, res) => {
+    res.writeHead(200, { "content-type": "application/json" });
+    if ((req.url ?? "").includes("/memories/keys")) {
+      res.end(JSON.stringify({ items: [] }));
+      return;
+    }
+    res.end(JSON.stringify({ ok: true, accepted: 0 }));
+  });
+  await new Promise((resolve) => cloud.listen(0, "127.0.0.1", resolve));
+  await fs.writeFile(
+    path.join(home, "config.json"),
+    JSON.stringify({
+      endpoint: `http://127.0.0.1:${cloud.address().port}`,
+      device_token: "test-token",
+      agent_id: "claude-code",
+    }),
+  );
+
   const { createServer } = await import(path.join(HERE, "..", "server.mjs"));
   server = createServer();
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   base = `http://127.0.0.1:${server.address().port}`;
 });
 
-afterAll(() => server?.close());
+afterAll(() => {
+  server?.close();
+  cloud?.close();
+});
 
 describe("桌面管理 API", () => {
   it("记忆列表返回本地缓存", async () => {
@@ -75,18 +98,28 @@ describe("桌面管理 API", () => {
     expect(audit.body.items.some((a) => a.action === "memory.delete")).toBe(true);
   });
 
-  it("调整 Agent 掩码并标记 grants 重算", async () => {
+  it("无 token 拒绝假装撤销", async () => {
+    const cfg = path.join(home, "config.json");
+    const prev = await fs.readFile(cfg, "utf8");
+    await fs.writeFile(cfg, "{}");
+    const r = await api("/api/agents/claude-code/revoke", { method: "POST" });
+    expect(r.status).toBe(401);
+    await fs.writeFile(cfg, prev);
+  });
+
+  it("调整 Agent 掩码并打到云端", async () => {
     const r = await api("/api/agents/claude-code/mask", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ mask: 4 }),
     });
-    expect(r.body.grantsStale).toBe(true);
+    expect(r.status).toBe(200);
+    expect(r.body.ok).toBe(true);
     const agents = await api("/api/agents");
     expect(agents.body.items[0].permissionMask).toBe(4);
   });
 
-  it("撤销 Agent", async () => {
+  it("撤销 Agent 打到云端", async () => {
     const r = await api("/api/agents/claude-code/revoke", { method: "POST" });
     expect(r.body.ok).toBe(true);
     const agents = await api("/api/agents");

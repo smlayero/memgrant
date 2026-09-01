@@ -1,0 +1,12 @@
+memory-backbone
+Copyright 2026 memory-backbone contributors
+
+This product is licensed under the Apache License, Version 2.0.
+See the LICENSE file for the full license text.
+
+This product includes cryptographic implementations that follow
+published specifications (BIP-39, RFC 9382 SPAKE2, AES-256-GCM,
+AES-KW, ECIES over secp256k1). The SPAKE2 implementation is
+self-assembled around audited primitives (@noble/curves, @noble/hashes)
+and has not itself received a third-party protocol audit.
+See SECURITY.md.

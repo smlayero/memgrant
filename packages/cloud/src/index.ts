@@ -88,7 +88,9 @@ async function auth(
 }
 
 app.use("/api/*", async (c, next) => {
-  if (c.req.path.startsWith("/api/auth/")) return next();
+  if (c.req.path.startsWith("/api/auth/") || c.req.path.startsWith("/api/pairing/")) {
+    return next();
+  }
   const who = await auth(c);
   if (!who) return c.json({ error: "unauthorized" }, 401);
   c.set("userId", who.userId);
@@ -105,6 +107,7 @@ app.post("/api/auth/register", async (c) => {
     device_name?: string;
     device_type?: string;
     paired_via?: string;
+    recovery_verifier?: string;
   }>();
   if (!body.fixed_salt || !body.device_pubkey) {
     return c.json({ error: "fixed_salt and device_pubkey required" }, 400);
@@ -113,10 +116,9 @@ app.post("/api/auth/register", async (c) => {
   const deviceId = randomId();
   const deviceToken = randomId(32);
   await c.env.DB.batch([
-    c.env.DB.prepare(`INSERT INTO users (user_id, fixed_salt) VALUES (?, ?)`).bind(
-      userId,
-      body.fixed_salt,
-    ),
+    c.env.DB.prepare(
+      `INSERT INTO users (user_id, fixed_salt, recovery_verifier) VALUES (?, ?, ?)`,
+    ).bind(userId, body.fixed_salt, body.recovery_verifier ?? null),
     c.env.DB.prepare(
       `INSERT INTO devices (device_id, user_id, device_name, device_type, device_pubkey, device_token, paired_via, last_seen)
        VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
@@ -144,6 +146,88 @@ app.get("/api/auth/salt/:user_id", async (c) => {
   return c.json({ fixed_salt: row.fixed_salt });
 });
 
+/** 已有设备登记一台新设备（配对成功后由发起方调用）。 */
+app.post("/api/auth/devices", async (c) => {
+  const who = await auth(c);
+  if (!who) return c.json({ error: "unauthorized" }, 401);
+  const body = await c.req.json<{
+    device_pubkey: string;
+    device_name?: string;
+    device_type?: string;
+    paired_via?: string;
+  }>();
+  if (!body.device_pubkey) return c.json({ error: "device_pubkey required" }, 400);
+  const deviceId = randomId();
+  const deviceToken = randomId(32);
+  await c.env.DB.prepare(
+    `INSERT INTO devices (device_id, user_id, device_name, device_type, device_pubkey, device_token, paired_via, last_seen)
+     VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+  )
+    .bind(
+      deviceId,
+      who.userId,
+      body.device_name ?? null,
+      body.device_type ?? null,
+      body.device_pubkey,
+      deviceToken,
+      body.paired_via ?? "pake",
+    )
+    .run();
+  return c.json({
+    user_id: who.userId,
+    device_id: deviceId,
+    device_token: deviceToken,
+  });
+});
+
+/**
+ * 助记词恢复：证明持有 MK（recovery_verifier）后登记新设备。
+ * 云端只比对哈希，永不接收 MK。
+ */
+app.post("/api/auth/recover", async (c) => {
+  const body = await c.req.json<{
+    user_id: string;
+    recovery_verifier: string;
+    device_pubkey: string;
+    device_name?: string;
+    device_type?: string;
+  }>();
+  if (!body.user_id || !body.recovery_verifier || !body.device_pubkey) {
+    return c.json({ error: "user_id, recovery_verifier, device_pubkey required" }, 400);
+  }
+  const row = await c.env.DB.prepare(
+    `SELECT recovery_verifier FROM users WHERE user_id = ?`,
+  )
+    .bind(body.user_id)
+    .first<{ recovery_verifier: string | null }>();
+  if (!row?.recovery_verifier) {
+    return c.json({ error: "recovery not enabled; pair with an existing device" }, 400);
+  }
+  if (row.recovery_verifier !== body.recovery_verifier) {
+    return c.json({ error: "verifier mismatch" }, 403);
+  }
+  const deviceId = randomId();
+  const deviceToken = randomId(32);
+  await c.env.DB.prepare(
+    `INSERT INTO devices (device_id, user_id, device_name, device_type, device_pubkey, device_token, paired_via, last_seen)
+     VALUES (?, ?, ?, ?, ?, ?, 'mnemonic', datetime('now'))`,
+  )
+    .bind(
+      deviceId,
+      body.user_id,
+      body.device_name ?? null,
+      body.device_type ?? null,
+      body.device_pubkey,
+      deviceToken,
+    )
+    .run();
+  return c.json({
+    user_id: body.user_id,
+    device_id: deviceId,
+    device_token: deviceToken,
+  });
+});
+
 // ---------- 记忆写入/读取 ----------
 
 interface SyncPayload {
@@ -158,6 +242,7 @@ interface SyncPayload {
   source_agent?: string;
   judge_model_version?: string;
   size_bytes?: number;
+  encrypted_tags?: string;
   grants?: Array<{ grantId: string; agentId: string; memoryId: string; encDekB64: string }>;
   updated_at: string;
 }
@@ -201,13 +286,14 @@ app.post("/api/memory/sync", async (c) => {
 
   const stmts: D1PreparedStatement[] = [
     c.env.DB.prepare(
-      `INSERT INTO memories (memory_id, user_id, ciphertext, wrapped_dek, type, tags, permission_level, importance, source_agent, judge_model_version, size_bytes, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?)
+      `INSERT INTO memories (memory_id, user_id, ciphertext, wrapped_dek, type, tags, encrypted_tags, permission_level, importance, source_agent, judge_model_version, size_bytes, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?)
        ON CONFLICT(user_id, memory_id) DO UPDATE SET
          ciphertext = excluded.ciphertext,
          wrapped_dek = excluded.wrapped_dek,
          type = excluded.type,
          tags = excluded.tags,
+         encrypted_tags = excluded.encrypted_tags,
          permission_level = excluded.permission_level,
          importance = excluded.importance,
          judge_model_version = excluded.judge_model_version,
@@ -222,6 +308,7 @@ app.post("/api/memory/sync", async (c) => {
       p.wrapped_dek,
       p.type ?? null,
       JSON.stringify(safeTags),
+      p.encrypted_tags ?? null,
       p.permission_level ?? 2,
       p.importance ?? null,
       p.source_agent ?? null,
@@ -258,17 +345,44 @@ app.post("/api/memory/sync", async (c) => {
 app.get("/api/memory/fetch/:id", async (c) => {
   const userId = c.get("userId");
   const row = await c.env.DB.prepare(
-    `SELECT ciphertext, wrapped_dek FROM memories
+    `SELECT ciphertext, wrapped_dek, type, tags, permission_level, importance, source_agent, created_at, updated_at
+     FROM memories
      WHERE memory_id = ? AND user_id = ? AND deleted_at IS NULL`,
   )
     .bind(c.req.param("id"), userId)
-    .first<{ ciphertext: string; wrapped_dek: string }>();
+    .first<{
+      ciphertext: string;
+      wrapped_dek: string;
+      type: string | null;
+      tags: string | null;
+      permission_level: number;
+      importance: number | null;
+      source_agent: string | null;
+      created_at: string | null;
+      updated_at: string | null;
+    }>();
   if (!row) return c.json({ error: "not found" }, 404);
   const obj = await c.env.VAULT.get(row.ciphertext);
   if (!obj) return c.json({ error: "ciphertext missing" }, 404);
   const buf = new Uint8Array(await obj.arrayBuffer());
   const b64 = btoa(String.fromCharCode(...buf));
-  return c.json({ ciphertext: b64, wrapped_dek: row.wrapped_dek });
+  let tags: string[] = [];
+  try {
+    tags = row.tags ? (JSON.parse(row.tags) as string[]) : [];
+  } catch {
+    tags = [];
+  }
+  return c.json({
+    ciphertext: b64,
+    wrapped_dek: row.wrapped_dek,
+    type: row.type,
+    tags,
+    permission_level: row.permission_level,
+    importance: row.importance,
+    source_agent: row.source_agent,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  });
 });
 
 /** Agent 读取：返回密文 + 该 Agent 的 grant；无 grant → 404（双保险，方案 §7.1）。 */
@@ -420,6 +534,46 @@ app.delete("/api/permissions/revoke/:agent_id", async (c) => {
     ).bind(userId, agentId),
   ]);
   return c.json({ ok: true, revoked: agentId });
+});
+
+/** 调整掩码：立刻删掉超出新掩码的 grants；提升掩码时由客户端补传新 grant。 */
+app.put("/api/permissions/update/:agent_id", async (c) => {
+  const userId = c.get("userId");
+  const agentId = c.req.param("agent_id");
+  const body = await c.req.json<{ permission_mask: number }>();
+  const mask = body.permission_mask;
+  if (typeof mask !== "number" || mask < 0 || mask > 4) {
+    return c.json({ error: "permission_mask must be 0-4" }, 400);
+  }
+  const existing = await c.env.DB.prepare(
+    `SELECT access_id FROM agent_access WHERE user_id = ? AND agent_id = ? AND status = 'active'`,
+  )
+    .bind(userId, agentId)
+    .first<{ access_id: string }>();
+  if (!existing) return c.json({ error: "agent not found" }, 404);
+  await c.env.DB.batch([
+    c.env.DB.prepare(
+      `UPDATE agent_access SET permission_mask = ? WHERE user_id = ? AND agent_id = ?`,
+    ).bind(mask, userId, agentId),
+    c.env.DB.prepare(
+      `DELETE FROM agent_grants WHERE user_id = ? AND agent_id = ? AND memory_id IN (
+         SELECT memory_id FROM memories WHERE user_id = ? AND permission_level > ?
+       )`,
+    ).bind(userId, agentId, userId, mask),
+  ]);
+  return c.json({ ok: true, permission_mask: mask });
+});
+
+/** 用户设备列出 wrapped_dek，供权限变更时重算 grants（不含内容密文）。 */
+app.get("/api/memories/keys", async (c) => {
+  const userId = c.get("userId");
+  const rows = await c.env.DB.prepare(
+    `SELECT memory_id, wrapped_dek, permission_level FROM memories
+     WHERE user_id = ? AND deleted_at IS NULL`,
+  )
+    .bind(userId)
+    .all<{ memory_id: string; wrapped_dek: string; permission_level: number }>();
+  return c.json({ items: rows.results ?? [] });
 });
 
 // ---------- 同步 ----------

@@ -53,7 +53,7 @@ describe("离线队列（R2）", () => {
     const fetchOk = async () => new Response("{}", { status: 200 });
     const client = new SyncClient({
       endpoint: "http://localhost:8787",
-      token: "t",
+      token: "test-token",
       fetchImpl: fetchOk as typeof fetch,
     });
     const res = await client.pushOutbox(store);
@@ -70,7 +70,7 @@ describe("离线队列（R2）", () => {
     const dead: string[] = [];
     const client = new SyncClient({
       endpoint: "http://localhost:8787",
-      token: "t",
+      token: "test-token",
       fetchImpl: fetchFail as typeof fetch,
       maxAttempts: 5,
       onDeadLetter: (id) => dead.push(id),
@@ -85,9 +85,10 @@ describe("离线队列（R2）", () => {
     }
     expect(dead).toEqual(["m1"]);
     expect(store.outboxSize()).toBe(0);
+    expect(store.deadLetterCount()).toBe(1);
   });
 
-  it("退避间隔指数增长（5s 基础）", async () => {
+  it("退避间隔指数增长（5s 起步）", async () => {
     const store = await LocalStore.open();
     store.enqueue("create", "m1", "{}");
     const before = Date.now();
@@ -95,6 +96,70 @@ describe("离线队列（R2）", () => {
     store.scheduleRetry(item.id, 1);
     store.scheduleRetry(item.id, 2);
     const r2 = store.dueOutbox(Date.now() + 60 * 1000)[0]!;
-    expect(r2.nextRetryAt - before).toBeGreaterThanOrEqual(20 * 1000);
+    // 新公式：5000 * 2^(attempts-1)，attempts=2 → 10000ms
+    expect(r2.nextRetryAt - before).toBeGreaterThanOrEqual(10 * 1000);
+  });
+});
+
+describe("同步回填", () => {
+  it("pullAndApply：create 拉密文并交给 apply，delete 标记本地删除", async () => {
+    const store = await LocalStore.open();
+    store.putMemory(sample("gone", "将被删除"));
+    const fetches: string[] = [];
+    const fetchImpl = async (url: string) => {
+      if (url.includes("/api/sync/changes")) {
+        return new Response(
+          JSON.stringify({
+            changes: [
+              { cursor: "1", memoryId: "m-new", op: "create" },
+              { cursor: "2", memoryId: "gone", op: "delete" },
+            ],
+            cursor: "2",
+          }),
+        );
+      }
+      fetches.push(url);
+      return new Response(
+        JSON.stringify({
+          ciphertext: "Yw==",
+          wrapped_dek: "ZA==",
+          type: "preference",
+        }),
+      );
+    };
+    const client = new SyncClient({
+      endpoint: "http://localhost:8787",
+      token: "t",
+      fetchImpl: fetchImpl as typeof fetch,
+    });
+    const applied: string[] = [];
+    const result = await client.pullAndApply(store, async (id) => {
+      applied.push(id);
+    });
+    expect(result.applied).toBe(1);
+    expect(result.deleted).toBe(1);
+    expect(applied).toEqual(["m-new"]);
+    expect(store.getMemory("gone")?.deleted).toBe(true);
+  });
+
+  it("connectWs 不把 token 拼进 URL", () => {
+    const Original = globalThis.WebSocket;
+    const seen: string[] = [];
+    globalThis.WebSocket = class {
+      constructor(url: string, protocols?: string | string[]) {
+        seen.push(url);
+        this.protocol = Array.isArray(protocols) ? protocols[0] : protocols;
+      }
+      protocol?: string;
+      onmessage: ((ev: { data: string }) => void) | null = null;
+    } as unknown as typeof WebSocket;
+    try {
+      const client = new SyncClient({ endpoint: "http://localhost:8787", token: "secret-token" });
+      client.connectWs();
+      expect(seen[0]).toBe("ws://localhost:8787/api/sync/ws");
+      expect(seen[0]).not.toContain("secret-token");
+    } finally {
+      globalThis.WebSocket = Original;
+    }
   });
 });

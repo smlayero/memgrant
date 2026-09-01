@@ -78,6 +78,8 @@ describe("S4: Agent 密码学隔离", () => {
       agentWide.secretKey,
     );
     expect(pt).toBe("我的密码是 hunter2，请记住");
+    expect(payload.encrypted_tags).toBeTruthy();
+    expect(JSON.stringify(payload)).not.toContain("credential");
   });
 
   it("授权范围内（mask 覆盖）才可解密", async () => {

@@ -1,0 +1,71 @@
+#!/usr/bin/env node
+/**
+ * 本机初始化：生成助记词、写入 Keychain、向同步节点注册首设备。
+ */
+import { promises as fs } from "node:fs";
+import path from "node:path";
+import os from "node:os";
+import { fileURLToPath } from "node:url";
+
+const sdk = await import(
+  new URL("../packages/sdk-core/dist/index.js", import.meta.url).href
+);
+
+function mbHome() {
+  return process.env.MB_HOME ?? path.join(os.homedir(), ".memory-backbone");
+}
+
+const endpoint = (process.env.MB_ENDPOINT ?? "http://127.0.0.1:8787").replace(/\/$/, "");
+const home = mbHome();
+await fs.mkdir(home, { recursive: true });
+
+const bundle = sdk.generateMnemonicBundle();
+const deviceKeys = sdk.generateAgentKeyPair();
+const kc = sdk.createBestKeychain(home);
+await kc.setMk(bundle.mk);
+
+const verifier = sdk.recoveryVerifier(bundle.mk);
+const res = await fetch(`${endpoint}/api/auth/register`, {
+  method: "POST",
+  headers: { "content-type": "application/json" },
+  body: JSON.stringify({
+    fixed_salt: bundle.fixedSaltHex,
+    device_pubkey: sdk.toBase64(deviceKeys.publicKey),
+    device_name: os.hostname(),
+    device_type: process.platform,
+    paired_via: "mnemonic",
+    recovery_verifier: verifier,
+  }),
+});
+if (!res.ok) {
+  console.error("register failed:", res.status, await res.text());
+  process.exit(1);
+}
+const body = await res.json();
+
+const config = {
+  endpoint,
+  user_id: body.user_id,
+  device_id: body.device_id,
+  device_token: body.device_token,
+  agent_id: process.env.MB_AGENT_ID ?? "claude-code",
+  cache: { dir: home },
+  telemetry: { opt_in: false },
+};
+await fs.writeFile(path.join(home, "config.json"), JSON.stringify(config, null, 2), {
+  encoding: "utf8",
+  mode: 0o600,
+});
+
+console.log("已写入", path.join(home, "config.json"));
+console.log("user_id:", body.user_id);
+console.log("Keychain:", kc.id);
+console.log("");
+console.log("助记词（只显示一次，请离线抄写）：");
+console.log(bundle.mnemonic);
+console.log("");
+console.log("下一步：配置 MCP 指向 packages/mcp-server/dist/index.js，或 npm run desktop");
+
+bundle.mk.fill(0);
+deviceKeys.secretKey.fill(0);
+void fileURLToPath;

@@ -1,0 +1,10 @@
+# 本机隔离运行 wrangler dev。密钥与缓存请放在宿主机 MB_HOME，不要放进镜像。
+services:
+  sync:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8787:8787"
+    environment:
+      - NODE_ENV=development

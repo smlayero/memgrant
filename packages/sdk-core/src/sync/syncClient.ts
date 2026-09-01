@@ -1,7 +1,7 @@
 /**
  * 同步客户端（方案 §五）。
  *
- * - 离线队列：指数退避（5s 基础 ×2^n），5 次后放弃并保留在死信
+ * - 离线队列：指数退避（5s 起步 ×2^(n-1)），5 次后移入死信表保留
  * - 增量同步：GET /api/sync/changes?since={cursor} 游标分页
  * - 实时通道：WebSocket 接收变更事件（仅 memory_id + 操作类型，不含内容）
  * - fetch/WebSocket 均可注入，便于测试与多运行时复用
@@ -70,7 +70,7 @@ export class SyncClient {
       } catch {
         const attempts = item.attempts + 1;
         if (attempts >= this.maxAttempts) {
-          store.removeOutbox(item.id);
+          store.moveToDeadLetter(item, attempts);
           this.onDeadLetter?.(item.memoryId, item.op);
           result.deadLettered++;
         } else {
@@ -100,10 +100,64 @@ export class SyncClient {
     return { events: body.changes, cursor: body.cursor };
   }
 
-  /** WebSocket 实时通道（Node 22 原生 WebSocket / 浏览器同源 API）。 */
+  /** 拉取增量变更并回填本地缓存。 */
+  async pullAndApply(
+    store: LocalStore,
+    apply: (
+      memoryId: string,
+      fetched: {
+        ciphertext: string;
+        wrapped_dek: string;
+        type?: string;
+        tags?: string[];
+        permission_level?: number;
+        importance?: number;
+        source_agent?: string | null;
+        created_at?: string;
+        updated_at?: string;
+      },
+    ) => Promise<void>,
+  ): Promise<{ applied: number; deleted: number }> {
+    const { events } = await this.pullChanges(store);
+    let applied = 0;
+    let deleted = 0;
+    for (const ev of events) {
+      if (ev.op === "delete") {
+        store.markDeleted(ev.memoryId, new Date().toISOString());
+        deleted++;
+        continue;
+      }
+      const res = await this.fetchImpl(
+        `${this.endpoint}/api/memory/fetch/${encodeURIComponent(ev.memoryId)}`,
+        { headers: this.headers() },
+      );
+      if (res.status === 404) {
+        store.markDeleted(ev.memoryId, new Date().toISOString());
+        deleted++;
+        continue;
+      }
+      if (!res.ok) throw new Error(`fetch http ${res.status}`);
+      const body = (await res.json()) as {
+        ciphertext: string;
+        wrapped_dek: string;
+        type?: string;
+        tags?: string[];
+        permission_level?: number;
+        importance?: number;
+        source_agent?: string | null;
+        created_at?: string;
+        updated_at?: string;
+      };
+      await apply(ev.memoryId, body);
+      applied++;
+    }
+    return { applied, deleted };
+  }
+
+  /** WebSocket 实时通道。Token 只走 Sec-WebSocket-Protocol，不进 URL。 */
   connectWs(): WebSocket {
-    const wsUrl = `${this.endpoint.replace(/^http/, "ws")}/api/sync/ws?token=${encodeURIComponent(this.token)}`;
-    const ws = new WebSocket(wsUrl);
+    const wsUrl = `${this.endpoint.replace(/^http/, "ws")}/api/sync/ws`;
+    const ws = new WebSocket(wsUrl, [this.token]);
     ws.onmessage = (ev) => {
       try {
         const data = JSON.parse(String(ev.data)) as SyncChangeEvent;

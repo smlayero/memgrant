@@ -3,8 +3,9 @@
 
 CREATE TABLE IF NOT EXISTS users (
   user_id TEXT PRIMARY KEY,
-  plan TEXT DEFAULT 'free',            -- free/pro/team/enterprise
+  plan TEXT DEFAULT 'free',            -- 自托管保留分档字段，不计费
   fixed_salt TEXT NOT NULL,            -- 用户级固定 salt（非秘密），助记词派生 MK 用
+  recovery_verifier TEXT,              -- SHA-256(domain || MK)，助记词恢复证明持有 MK
   storage_used INTEGER DEFAULT 0,
   max_devices INTEGER DEFAULT 2,
   max_memories INTEGER DEFAULT 10000,

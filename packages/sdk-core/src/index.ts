@@ -13,3 +13,4 @@ export * from "./sync/syncClient.js";
 export * from "./memory/memoryService.js";
 export * from "./pairing/spake2.js";
 export * from "./pairing/pairing.js";
+export * from "./pairing/httpChannel.js";

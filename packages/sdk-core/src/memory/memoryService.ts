@@ -47,6 +47,7 @@ export interface MemorySyncPayload {
   wrapped_dek?: string; // base64
   type?: string;
   tags?: string[]; // 仅白名单类别级
+  encrypted_tags?: string; // DEK 加密的敏感标签，禁入明文 tags
   permission_level?: number;
   importance?: number;
   source_agent?: string;
@@ -85,6 +86,15 @@ export class MemoryService {
         permissionLevel: judge.permissionLevel,
       });
 
+      let encryptedTags: string | undefined;
+      if (judge.sensitiveTags.length > 0) {
+        const sealedTags = await sealWithDek(
+          dek,
+          utf8ToBytes(JSON.stringify(judge.sensitiveTags)),
+        );
+        encryptedTags = toBase64(sealedTags.sealed);
+      }
+
       // 本地明文缓存（本地优先，云端不可用可读）
       const local: LocalMemory = {
         memoryId,
@@ -118,6 +128,7 @@ export class MemoryService {
         grants,
         updated_at: now,
       };
+      if (encryptedTags) payload.encrypted_tags = encryptedTags;
       if (input.sourceAgent) payload.source_agent = input.sourceAgent;
       this.store.enqueue("create", memoryId, JSON.stringify(payload));
 
@@ -175,6 +186,40 @@ export class MemoryService {
       updated_at: now,
     };
     this.store.enqueue("delete", memoryId, JSON.stringify(payload));
+  }
+
+  /**
+   * 把云端拉回的密文写入本地缓存（多设备同步回填）。
+   * 明文只在本机落盘。
+   */
+  async applyFetched(
+    memoryId: string,
+    fetched: {
+      ciphertext: string;
+      wrapped_dek: string;
+      type?: string;
+      tags?: string[];
+      permission_level?: number;
+      importance?: number;
+      source_agent?: string | null;
+      created_at?: string;
+      updated_at?: string;
+    },
+  ): Promise<void> {
+    const text = await this.decryptAsUser(fetched.ciphertext, fetched.wrapped_dek);
+    const now = fetched.updated_at ?? new Date().toISOString();
+    this.store.putMemory({
+      memoryId,
+      plaintext: text,
+      type: fetched.type ?? "event",
+      tags: fetched.tags ?? [],
+      permissionLevel: fetched.permission_level ?? 2,
+      importance: fetched.importance ?? 0.5,
+      sourceAgent: fetched.source_agent ?? null,
+      createdAt: fetched.created_at ?? now,
+      updatedAt: now,
+      deleted: false,
+    });
   }
 
   private async requireMk(): Promise<Uint8Array> {

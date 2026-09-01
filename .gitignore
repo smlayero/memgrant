@@ -25,3 +25,13 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Secrets / local identity (never commit)
+.env
+.env.*
+!.env.example
+*.dpapi
+
+# Test / coverage
+coverage/
+.nyc_output/

@@ -2,10 +2,19 @@ name = "memory-backbone"
 main = "src/index.ts"
 compatibility_date = "2026-07-01"
 
+# wrangler dev 使用本地模拟的 D1/R2/KV，不必先创建云资源。
+# 部署到自己的 Cloudflare 账号时，用 wrangler d1/kv/r2 create 得到的真实 id 替换占位符。
+# 详见 docs/self-host.md
+
+[dev]
+ip = "127.0.0.1"
+port = 8787
+local_protocol = "http"
+
 [[d1_databases]]
 binding = "DB"
 database_name = "memory-backbone"
-database_id = "00000000-0000-0000-0000-000000000000" # wrangler d1 create 后替换
+database_id = "00000000-0000-0000-0000-000000000000"
 
 [[r2_buckets]]
 binding = "VAULT"
@@ -13,7 +22,7 @@ bucket_name = "memory-backbone-vault"
 
 [[kv_namespaces]]
 binding = "SESSIONS"
-id = "00000000000000000000000000000000" # wrangler kv namespace create 后替换
+id = "00000000000000000000000000000000"
 
 [durable_objects]
 bindings = [
