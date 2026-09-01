@@ -1,0 +1,28 @@
+name = "memory-backbone"
+main = "src/index.ts"
+compatibility_date = "2026-07-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "memory-backbone"
+database_id = "00000000-0000-0000-0000-000000000000" # wrangler d1 create 后替换
+
+[[r2_buckets]]
+binding = "VAULT"
+bucket_name = "memory-backbone-vault"
+
+[[kv_namespaces]]
+binding = "SESSIONS"
+id = "00000000000000000000000000000000" # wrangler kv namespace create 后替换
+
+[durable_objects]
+bindings = [
+  { name = "SYNC_HUB", class_name = "SyncHub" }
+]
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["SyncHub"]
+
+[vars]
+ENV = "staging"

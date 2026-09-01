@@ -1,0 +1,22 @@
+{
+  "name": "memory-backbone",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Cross-agent memory backbone: user-held, E2EE, cryptographic per-agent permissioning",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "workspaces": [
+    "packages/sdk-core",
+    "packages/cloud",
+    "packages/mcp-server",
+    "packages/adapters"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}

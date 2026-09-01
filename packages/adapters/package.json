@@ -1,0 +1,16 @@
+{
+  "name": "@memory-backbone/adapters",
+  "version": "0.1.0",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "description": "Agent 适配层：Claude Code Hooks + 一键安装（npx @memory-backbone/setup）",
+  "bin": {
+    "memory-backbone-setup": "./claude-code/setup.mjs"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "vitest": "^2.1.8"
+  }
+}

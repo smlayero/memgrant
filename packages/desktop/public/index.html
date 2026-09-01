@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>记忆骨干 · 管理台</title>
+<style>
+  :root {
+    --bg: #fafaf8; --surface: #ffffff; --border: #e4e2da;
+    --text: #2c2c2a; --muted: #888780; --accent: #0f6e56;
+    --accent-bg: #e1f5ee; --danger: #a32d2d; --danger-bg: #fcebeb;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body { font: 14px/1.6 -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; background: var(--bg); color: var(--text); }
+  header { padding: 14px 24px; border-bottom: 1px solid var(--border); background: var(--surface); display: flex; align-items: baseline; gap: 12px; }
+  header h1 { font-size: 16px; font-weight: 500; }
+  header .badge { font-size: 12px; color: var(--muted); }
+  nav { display: flex; gap: 4px; padding: 10px 24px 0; }
+  nav button { border: 1px solid var(--border); background: var(--surface); color: var(--text); padding: 6px 16px; border-radius: 8px 8px 0 0; cursor: pointer; font-size: 13px; }
+  nav button.active { background: var(--accent-bg); border-color: var(--accent); color: var(--accent); font-weight: 500; }
+  main { padding: 20px 24px; }
+  .panel { display: none; }
+  .panel.active { display: block; }
+  table { width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--border); font-size: 13px; }
+  th { color: var(--muted); font-weight: 500; font-size: 12px; }
+  tr:last-child td { border-bottom: none; }
+  .lv { display: inline-block; min-width: 28px; text-align: center; border-radius: 6px; font-size: 12px; padding: 1px 6px; background: var(--accent-bg); color: var(--accent); }
+  .lv.sensitive { background: var(--danger-bg); color: var(--danger); }
+  .btn { border: 1px solid var(--border); background: var(--surface); border-radius: 6px; padding: 3px 10px; cursor: pointer; font-size: 12px; }
+  .btn.danger { color: var(--danger); border-color: var(--danger); }
+  .btn.primary { color: var(--accent); border-color: var(--accent); }
+  .toolbar { display: flex; gap: 8px; margin-bottom: 12px; }
+  .toolbar input { flex: 1; max-width: 320px; border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; font-size: 13px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px; max-width: 560px; }
+  .card dt { color: var(--muted); font-size: 12px; margin-top: 8px; }
+  .card dd { font-size: 14px; }
+  .muted { color: var(--muted); font-size: 12px; }
+  select { border: 1px solid var(--border); border-radius: 6px; padding: 2px 6px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>记忆骨干 · 管理台</h1>
+  <span class="badge" id="keyBadge">加载中…</span>
+</header>
+<nav>
+  <button data-tab="memories" class="active">记忆</button>
+  <button data-tab="agents">Agent 权限</button>
+  <button data-tab="keys">密钥</button>
+  <button data-tab="audit">审计</button>
+</nav>
+<main>
+  <section id="memories" class="panel active">
+    <div class="toolbar">
+      <input id="q" placeholder="搜索记忆…" onkeydown="if(event.key==='Enter')loadMemories()">
+      <button class="btn primary" onclick="loadMemories()">搜索</button>
+    </div>
+    <table><thead><tr><th>内容</th><th>类型</th><th>级别</th><th>来源</th><th>更新时间</th><th></th></tr></thead><tbody id="memBody"></tbody></table>
+    <p class="muted" id="memCount"></p>
+  </section>
+  <section id="agents" class="panel">
+    <table><thead><tr><th>Agent</th><th>掩码（最高可读级别）</th><th>状态</th><th>操作</th></tr></thead><tbody id="agentBody"></tbody></table>
+    <p class="muted">掩码下调或撤销后，该 Agent 的授权凭据（grants）将被重算或删除——撤销 = 密码学上即时失效。</p>
+  </section>
+  <section id="keys" class="panel">
+    <dl class="card" id="keyCard"></dl>
+    <p class="muted">主密钥存于平台安全存储（Keychain/DPAPI/libsecret），此页面不显示任何密钥材料。</p>
+  </section>
+  <section id="audit" class="panel">
+    <table><thead><tr><th>时间</th><th>动作</th><th>详情</th></tr></thead><tbody id="auditBody"></tbody></table>
+  </section>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+document.querySelectorAll("nav button").forEach((b) => b.onclick = () => {
+  document.querySelectorAll("nav button").forEach((x) => x.classList.toggle("active", x === b));
+  document.querySelectorAll(".panel").forEach((p) => p.classList.toggle("active", p.id === b.dataset.tab));
+  if (b.dataset.tab === "agents") loadAgents();
+  if (b.dataset.tab === "audit") loadAudit();
+  if (b.dataset.tab === "keys") loadKeys();
+});
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+async function loadMemories() {
+  const q = $("q").value.trim();
+  const r = await (await fetch("/api/memories" + (q ? "?q=" + encodeURIComponent(q) : ""))).json();
+  $("memBody").innerHTML = (r.items ?? []).map((m) => `
+    <tr>
+      <td>${esc(m.plaintext.length > 60 ? m.plaintext.slice(0, 60) + "…" : m.plaintext)}</td>
+      <td>${esc(m.type)}</td>
+      <td><span class="lv ${m.permissionLevel >= 3 ? "sensitive" : ""}">L${m.permissionLevel}</span></td>
+      <td>${esc(m.sourceAgent ?? "—")}</td>
+      <td>${esc((m.updatedAt ?? "").slice(0, 16).replace("T", " "))}</td>
+      <td><button class="btn danger" onclick="delMemory('${esc(m.memoryId)}')">删除</button></td>
+    </tr>`).join("");
+  $("memCount").textContent = `共 ${r.total} 条`;
+}
+async function delMemory(id) {
+  if (!confirm("删除后云端密文与全部授权凭据一并销毁，确认？")) return;
+  await fetch("/api/memories/" + encodeURIComponent(id), { method: "DELETE" });
+  loadMemories();
+}
+
+async function loadAgents() {
+  const r = await (await fetch("/api/agents")).json();
+  $("agentBody").innerHTML = (r.items ?? []).map((a) => `
+    <tr>
+      <td>${esc(a.agentId)}</td>
+      <td><select onchange="setMask('${esc(a.agentId)}', this.value)" ${a.status !== "active" ? "disabled" : ""}>
+        ${[0,1,2,3,4].map((l) => `<option value="${l}" ${l === a.permissionMask ? "selected" : ""}>L${l}</option>`).join("")}
+      </select></td>
+      <td>${a.status === "active" ? "活跃" : "已撤销"}</td>
+      <td>${a.status === "active" ? `<button class="btn danger" onclick="revoke('${esc(a.agentId)}')">撤销</button>` : "—"}</td>
+    </tr>`).join("");
+}
+async function setMask(id, mask) {
+  await fetch(`/api/agents/${encodeURIComponent(id)}/mask`, {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ mask: Number(mask) }),
+  });
+  loadAgents();
+}
+async function revoke(id) {
+  if (!confirm(`撤销 ${id}？其全部授权凭据将被删除，此后无法解密任何新拉取的记忆。`)) return;
+  await fetch(`/api/agents/${encodeURIComponent(id)}/revoke`, { method: "POST" });
+  loadAgents();
+}
+
+async function loadKeys() {
+  const r = await (await fetch("/api/key-status")).json();
+  $("keyCard").innerHTML = `
+    <dt>安全存储后端</dt><dd>${esc(r.backend)}</dd>
+    <dt>主密钥状态</dt><dd>${r.initialized ? "已初始化" : "未初始化（需先运行 setup/恢复）"}</dd>
+    <dt>本机 Agent 身份</dt><dd>${esc(r.agentId ?? "—")}</dd>
+    <dt>云端端点</dt><dd>${esc(r.endpoint ?? "—")}</dd>`;
+  $("keyBadge").textContent = `${r.backend} · ${r.initialized ? "密钥就绪" : "未初始化"}`;
+}
+
+async function loadAudit() {
+  const r = await (await fetch("/api/audit")).json();
+  $("auditBody").innerHTML = (r.items ?? []).map((a) => `
+    <tr><td>${esc(a.ts.slice(0, 19).replace("T", " "))}</td><td>${esc(a.action)}</td><td>${esc(JSON.stringify(a.detail))}</td></tr>`).join("");
+}
+
+loadMemories(); loadKeys();
+</script>
+</body>
+</html>

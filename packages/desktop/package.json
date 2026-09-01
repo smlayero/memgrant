@@ -1,0 +1,17 @@
+{
+  "name": "@memory-backbone/desktop",
+  "version": "0.1.0",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "description": "桌面管理 App：记忆列表 / 权限管理 / 密钥管理 / 审计查看（本地 Web UI，127.0.0.1 绑定）",
+  "bin": {
+    "memory-backbone-desktop": "./server.mjs"
+  },
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "vitest": "^2.1.8"
+  }
+}
