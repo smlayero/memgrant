@@ -13,7 +13,7 @@ import os from "node:os";
 import { promises as fs } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-const sdk = await import("@memory-backbone/sdk-core");
+const sdk = await import("@memgrant/sdk-core");
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.MB_DESKTOP_PORT ?? 4787);
@@ -320,6 +320,6 @@ const isMain =
   process.argv[1] && import.meta.url.endsWith(path.basename(process.argv[1]));
 if (isMain) {
   createServer().listen(PORT, HOST, () => {
-    console.log(`memory-backbone 桌面管理: http://${HOST}:${PORT}`);
+    console.log(`memgrant 桌面管理: http://${HOST}:${PORT}`);
   });
 }

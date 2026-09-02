@@ -10,7 +10,7 @@ import { promisify } from "node:util";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const execFileAsync = promisify(execFile);
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -43,7 +43,7 @@ describe("Claude Code hooks", () => {
     for (const event of ["SessionStart", "Stop", "PreCompact"]) {
       const ours = settings.hooks[event]
         .flatMap((g) => g.hooks)
-        .filter((h) => h.command.includes("memory-backbone"));
+        .filter((h) => h.command.includes("claude-code"));
       expect(ours).toHaveLength(1); // 幂等：只有一个我们的 hook
     }
     // 其他 hook 保留
@@ -68,10 +68,13 @@ describe("Claude Code hooks", () => {
         "not-json-line",
       ].join("\n"),
     );
-    const { extractUserMessages } = await import(
-      path.join(ADAPTER_DIR, "stop.mjs")
-    );
-    const texts = await extractUserMessages(transcript);
+    const stopUrl = pathToFileURL(path.join(ADAPTER_DIR, "stop.mjs")).href;
+    const { stdout } = await execFileAsync(process.execPath, [
+      "--input-type=module",
+      "-e",
+      `import { extractUserMessages } from ${JSON.stringify(stopUrl)}; const texts = await extractUserMessages(${JSON.stringify(transcript)}); process.stdout.write(JSON.stringify(texts));`,
+    ]);
+    const texts = JSON.parse(stdout);
     expect(texts).toContain("请记住我偏好简洁回答");
     expect(texts).toContain("我喜欢用 pnpm 管理依赖");
     expect(texts).not.toContain("好的");

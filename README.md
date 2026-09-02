@@ -7,7 +7,7 @@
 A self-hosted, user-held, end-to-end encrypted memory layer for multiple agents.
 Each agent decrypts only what it has been granted. This repository does not run a hosted cloud.
 
-npm workspace name: `memory-backbone` (`@memory-backbone/*`)
+npm workspace name: `memgrant` (`@memgrant/*`)
 
 [VISION](VISION.md) · [SECURITY](SECURITY.md) · [Self-hosting](docs/self-host.md)
 
@@ -76,7 +76,7 @@ MCP (Claude Code, Cursor, and others):
 ```json
 {
   "mcpServers": {
-    "memory-backbone": {
+    "memgrant": {
       "command": "node",
       "args": ["path/to/packages/mcp-server/dist/index.js"]
     }
@@ -159,10 +159,10 @@ node scripts/revoke-demo.mjs     # revoke → 404
 After `npm login`, publish from the monorepo (cloud stays private / self-hosted):
 
 ```bash
-npm publish -w @memory-backbone/sdk-core --access public
-npm publish -w @memory-backbone/mcp-server --access public
-npm publish -w @memory-backbone/adapters --access public
-npm publish -w @memory-backbone/desktop --access public
+npm publish -w @memgrant/sdk-core --access public
+npm publish -w @memgrant/mcp-server --access public
+npm publish -w @memgrant/adapters --access public
+npm publish -w @memgrant/desktop --access public
 ```
 
 ## License

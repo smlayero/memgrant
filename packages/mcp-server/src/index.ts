@@ -25,7 +25,7 @@ import {
   type AgentAccess,
   type JudgeConfig,
   type EmbedderConfig,
-} from "@memory-backbone/sdk-core";
+} from "@memgrant/sdk-core";
 
 interface Config {
   endpoint: string;
@@ -108,7 +108,7 @@ async function main(): Promise<void> {
       : null;
 
   const server = new McpServer({
-    name: "memory-backbone",
+    name: "memgrant",
     version: "0.1.0",
   });
 
@@ -211,6 +211,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((err) => {
-  console.error("memory-backbone mcp server failed:", err);
+  console.error("memgrant mcp server failed:", err);
   process.exit(1);
 });

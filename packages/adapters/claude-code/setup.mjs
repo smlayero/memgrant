@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * 一键安装（方案 §6.3：npx @memory-backbone/setup）。
+ * 一键安装（npx @memgrant/adapters）。
  *
  * 把 SessionStart / Stop / PreCompact 三个 hook 写入 ~/.claude/settings.json。
  * 合并而非覆盖：已有其他 hook 的配置保留；重复执行幂等（先移除旧条目再写入）。
@@ -23,7 +23,7 @@ const OUR_HOOKS = {
   Stop: hookCommand("stop.mjs"),
   PreCompact: hookCommand("preCompact.mjs"),
 };
-const MARKER = "memory-backbone";
+const MARKERS = ["memgrant", "memory-backbone"];
 
 async function main() {
   const claudeDir = process.env.CLAUDE_CONFIG_DIR ?? path.join(os.homedir(), ".claude");
@@ -39,11 +39,14 @@ async function main() {
   settings.hooks = settings.hooks ?? {};
   for (const event of HOOK_EVENTS) {
     const groups = settings.hooks[event] ?? [];
-    // 幂等：剔除旧的 memory-backbone 条目
+    // 幂等：剔除旧的 memgrant / memory-backbone 条目
     const kept = groups
       .map((g) => ({
         ...g,
-        hooks: (g.hooks ?? []).filter((h) => !(h.command ?? "").includes(MARKER)),
+        hooks: (g.hooks ?? []).filter((h) => {
+          const cmd = h.command ?? "";
+          return !MARKERS.some((m) => cmd.includes(m));
+        }),
       }))
       .filter((g) => g.hooks.length > 0);
     kept.push({
@@ -55,7 +58,7 @@ async function main() {
   await fs.mkdir(claudeDir, { recursive: true });
   await fs.writeFile(settingsPath, JSON.stringify(settings, null, 2));
 
-  console.log(`memory-backbone hooks 已写入 ${settingsPath}`);
+  console.log(`memgrant hooks 已写入 ${settingsPath}`);
   console.log(`  SessionStart → ${OUR_HOOKS.SessionStart}`);
   console.log(`  Stop         → ${OUR_HOOKS.Stop}`);
   console.log(`  PreCompact   → ${OUR_HOOKS.PreCompact}`);

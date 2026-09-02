@@ -1,11 +1,11 @@
 {
-  "name": "@memory-backbone/desktop",
+  "name": "@memgrant/desktop",
   "version": "0.1.0",
   "license": "Apache-2.0",
   "type": "module",
   "description": "Local 127.0.0.1 console for memories, grants, keys, and audit",
   "bin": {
-    "memory-backbone-desktop": "./server.mjs"
+    "memgrant-desktop": "./server.mjs"
   },
   "files": ["server.mjs", "public"],
   "publishConfig": {
@@ -16,7 +16,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@memory-backbone/sdk-core": "0.1.0"
+    "@memgrant/sdk-core": "0.1.0"
   },
   "devDependencies": {
     "vitest": "^2.1.8"

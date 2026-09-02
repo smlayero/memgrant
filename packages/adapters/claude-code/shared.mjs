@@ -5,7 +5,7 @@ import path from "node:path";
 import { promises as fs } from "node:fs";
 import os from "node:os";
 
-const sdk = await import("@memory-backbone/sdk-core");
+const sdk = await import("@memgrant/sdk-core");
 
 export function mbHome() {
   return process.env.MB_HOME ?? path.join(os.homedir(), ".memory-backbone");

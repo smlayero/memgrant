@@ -88,7 +88,7 @@ async function main() {
   }
 
   if (saved > 0) {
-    process.stderr.write(`memory-backbone: 已自动保存 ${saved} 条记忆\n`);
+    process.stderr.write(`memgrant: 已自动保存 ${saved} 条记忆\n`);
   }
   process.exit(0);
 }

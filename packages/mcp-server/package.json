@@ -1,10 +1,10 @@
 {
-  "name": "@memory-backbone/mcp-server",
+  "name": "@memgrant/mcp-server",
   "version": "0.1.0",
   "license": "Apache-2.0",
   "type": "module",
   "bin": {
-    "memory-backbone-mcp": "./dist/index.js"
+    "memgrant-mcp": "./dist/index.js"
   },
   "files": ["dist"],
   "publishConfig": {
@@ -16,7 +16,7 @@
     "start": "node dist/index.js"
   },
   "dependencies": {
-    "@memory-backbone/sdk-core": "0.1.0",
+    "@memgrant/sdk-core": "0.1.0",
     "@modelcontextprotocol/sdk": "^1.12.1",
     "zod": "^3.24.1"
   },

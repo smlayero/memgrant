@@ -23,10 +23,11 @@ async function mergeCursorMcp() {
     /* first time */
   }
   existing.mcpServers = existing.mcpServers ?? {};
-  existing.mcpServers["memory-backbone"] = {
+  existing.mcpServers["memgrant"] = {
     command: "node",
     args: [mcpEntry],
   };
+  delete existing.mcpServers["memory-backbone"];
   await fs.writeFile(mcpPath, JSON.stringify(existing, null, 2));
   console.log("已写入 Cursor MCP:", mcpPath);
 }
@@ -42,6 +43,6 @@ await mergeCursorMcp();
 try {
   await run(process.execPath, [path.join(ROOT, "packages", "adapters", "claude-code", "setup.mjs")], ROOT);
 } catch (err) {
-  console.warn("Claude Code hooks 未写入（可稍后 npx @memory-backbone/adapters）：", err.message);
+  console.warn("Claude Code hooks 未写入（可稍后 npx @memgrant/adapters）：", err.message);
 }
 console.log("请在 Cursor 里重载 MCP。助记词仍是主密钥，不要用模型替换。");

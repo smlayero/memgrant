@@ -1,11 +1,11 @@
 {
-  "name": "@memory-backbone/adapters",
+  "name": "@memgrant/adapters",
   "version": "0.1.0",
   "license": "Apache-2.0",
   "type": "module",
-  "description": "Agent 适配层：Claude Code Hooks + 一键安装（npx @memory-backbone/setup）",
+  "description": "Agent 适配层：Claude Code Hooks + 一键安装（npx @memgrant/adapters）",
   "bin": {
-    "memory-backbone-setup": "./claude-code/setup.mjs"
+    "memgrant-setup": "./claude-code/setup.mjs"
   },
   "files": ["claude-code"],
   "publishConfig": {
@@ -15,7 +15,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@memory-backbone/sdk-core": "0.1.0"
+    "@memgrant/sdk-core": "0.1.0"
   },
   "devDependencies": {
     "vitest": "^2.1.8"

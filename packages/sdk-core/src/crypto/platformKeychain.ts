@@ -198,7 +198,7 @@ export function createPlatformKeychain(dir?: string): Keychain {
       return new LinuxSecretKeychain();
     default:
       console.warn(
-        `[memory-backbone] 无平台安全存储后端（${process.platform}），降级文件 Keychain（0600）`,
+        `[memgrant] 无平台安全存储后端（${process.platform}），降级文件 Keychain（0600）`,
       );
       return FileKeychain.default(dir);
   }
@@ -255,7 +255,7 @@ class FallbackKeychain implements Keychain {
     if (this.warned) return;
     this.warned = true;
     console.warn(
-      "[memory-backbone] 平台 Keychain 不可用，MK 降级写入 0600 文件。见 SECURITY.md",
+      "[memgrant] 平台 Keychain 不可用，MK 降级写入 0600 文件。见 SECURITY.md",
     );
   }
 }

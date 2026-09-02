@@ -1,5 +1,5 @@
 {
-  "name": "memory-backbone",
+  "name": "memgrant",
   "version": "0.1.0",
   "private": true,
   "description": "Self-hosted, user-held, E2EE cross-agent memory with cryptographic per-agent grants",
@@ -24,11 +24,11 @@
     "build": "npm run build --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "dev:cloud": "npm run dev --workspace @memory-backbone/cloud",
+    "dev:cloud": "npm run dev --workspace @memgrant/cloud",
     "setup": "node scripts/setup.mjs",
     "clients": "node scripts/install-clients.mjs",
     "deploy:cf": "node scripts/deploy-cloudflare.mjs",
-    "desktop": "npm start --workspace @memory-backbone/desktop",
+    "desktop": "npm start --workspace @memgrant/desktop",
     "e2e": "node scripts/e2e-selfhost.mjs",
     "revoke-demo": "node scripts/revoke-demo.mjs"
   },

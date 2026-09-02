@@ -26,7 +26,7 @@ async function main() {
 
   if (allowed.length === 0) process.exit(0);
 
-  let out = "## 用户长期记忆（memory-backbone，按权限过滤）\n";
+  let out = "## 用户长期记忆（memgrant，按权限过滤）\n";
   for (const m of allowed) {
     const line = `- [${m.type}] ${m.plaintext}\n`;
     if (out.length + line.length > MAX_CHARS) break;

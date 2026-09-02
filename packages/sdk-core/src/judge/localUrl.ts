@@ -15,6 +15,6 @@ export function isLoopbackUrl(url: string): boolean {
 export function warnIfRemoteModelUrl(kind: string, url: string): void {
   if (isLoopbackUrl(url)) return;
   console.warn(
-    `[memory-backbone] ${kind} baseUrl is not loopback (${url}). Plaintext will leave this device.`,
+    `[memgrant] ${kind} baseUrl is not loopback (${url}). Plaintext will leave this device.`,
   );
 }

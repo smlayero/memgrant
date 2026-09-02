@@ -7,7 +7,7 @@
 用户自持密钥、端到端加密、按 Agent 密码学授权的跨 Agent 记忆组件。
 同步服务由你自己部署。本仓库不运营托管云。
 
-npm 工作区名：`memory-backbone`（`@memory-backbone/*`）
+npm 工作区名：`memgrant`（`@memgrant/*`）
 
 [愿景](VISION.md) · [安全](SECURITY.md) · [自托管](docs/self-host.md)
 
@@ -76,7 +76,7 @@ MCP（Claude Code / Cursor 等）：
 ```json
 {
   "mcpServers": {
-    "memory-backbone": {
+    "memgrant": {
       "command": "node",
       "args": ["path/to/packages/mcp-server/dist/index.js"]
     }
@@ -157,10 +157,10 @@ node scripts/revoke-demo.mjs     # 撤销后 Agent 读取 404
 本机 `npm login` 之后可发布（cloud 保持 private，自己部署）：
 
 ```bash
-npm publish -w @memory-backbone/sdk-core --access public
-npm publish -w @memory-backbone/mcp-server --access public
-npm publish -w @memory-backbone/adapters --access public
-npm publish -w @memory-backbone/desktop --access public
+npm publish -w @memgrant/sdk-core --access public
+npm publish -w @memgrant/mcp-server --access public
+npm publish -w @memgrant/adapters --access public
+npm publish -w @memgrant/desktop --access public
 ```
 
 ## 许可证

@@ -47,4 +47,4 @@ if (who.code !== 0) {
   process.exit(0);
 }
 
-console.log("已登录。请按 docs/self-host.md 填好 wrangler.toml 后执行: npm run deploy --workspace @memory-backbone/cloud");
+console.log("已登录。请按 docs/self-host.md 填好 wrangler.toml 后执行: npm run deploy --workspace @memgrant/cloud");
