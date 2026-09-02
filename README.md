@@ -2,7 +2,7 @@
   <a href="./README.zh-CN.md">中文</a> · <b>English</b>
 </p>
 
-# cross-agent-memory
+# memgrant
 
 A self-hosted, user-held, end-to-end encrypted memory layer for multiple agents.
 Each agent decrypts only what it has been granted. This repository does not run a hosted cloud.

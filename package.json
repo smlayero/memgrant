@@ -6,11 +6,11 @@
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "git+ssh://git@github.com/smlum666/cross-agent-memory.git"
+    "url": "git+ssh://git@github.com/smlayero/memgrant.git"
   },
-  "homepage": "https://github.com/smlum666/cross-agent-memory",
+  "homepage": "https://github.com/smlayero/memgrant",
   "bugs": {
-    "url": "https://github.com/smlum666/cross-agent-memory/issues"
+    "url": "https://github.com/smlayero/memgrant/issues"
   },
   "type": "module",
   "workspaces": [

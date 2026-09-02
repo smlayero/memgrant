@@ -2,7 +2,7 @@
   <b>中文</b> · <a href="./README.md">English</a>
 </p>
 
-# cross-agent-memory
+# memgrant
 
 用户自持密钥、端到端加密、按 Agent 密码学授权的跨 Agent 记忆组件。
 同步服务由你自己部署。本仓库不运营托管云。

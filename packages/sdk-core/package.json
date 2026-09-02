@@ -18,7 +18,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/smlum666/cross-agent-memory.git"
+    "url": "git+https://github.com/smlayero/memgrant.git"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
