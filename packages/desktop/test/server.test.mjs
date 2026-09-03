@@ -6,7 +6,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import http from "node:http";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 let server;
@@ -72,7 +72,7 @@ beforeAll(async () => {
     }),
   );
 
-  const { createServer } = await import(path.join(HERE, "..", "server.mjs"));
+  const { createServer } = await import(pathToFileURL(path.join(HERE, "..", "server.mjs")).href);
   server = createServer();
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   base = `http://127.0.0.1:${server.address().port}`;
@@ -128,6 +128,29 @@ describe("桌面管理 API", () => {
     expect(r.body.ok).toBe(true);
     const agents = await api("/api/agents");
     expect(agents.body.items[0].status).toBe("revoked");
+  });
+
+  it("添加 Agent 写入公钥与掩码", async () => {
+    const r = await api("/api/agents", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ agentId: "gemini-cli", permissionMask: 1 }),
+    });
+    expect(r.status).toBe(201);
+    expect(r.body.item.agentId).toBe("gemini-cli");
+    expect(r.body.item.permissionMask).toBe(1);
+    expect(r.body.item.agentPublicKeyB64.length).toBeGreaterThan(8);
+    const list = await api("/api/agents");
+    expect(list.body.items.some((a) => a.agentId === "gemini-cli")).toBe(true);
+  });
+
+  it("重复 Agent ID 被拒绝", async () => {
+    const r = await api("/api/agents", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ agentId: "claude-code", permissionMask: 2 }),
+    });
+    expect(r.status).toBe(409);
   });
 
   it("密钥状态不暴露密钥材料", async () => {

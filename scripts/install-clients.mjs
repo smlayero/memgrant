@@ -26,6 +26,7 @@ async function mergeCursorMcp() {
   existing.mcpServers["memgrant"] = {
     command: "node",
     args: [mcpEntry],
+    env: { MB_AGENT_ID: "cursor" },
   };
   delete existing.mcpServers["memory-backbone"];
   await fs.writeFile(mcpPath, JSON.stringify(existing, null, 2));

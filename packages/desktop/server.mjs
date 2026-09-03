@@ -1,6 +1,5 @@
-#!/usr/bin/env node
 /**
- * 桌面管理 App 服务器（方案 §6.1 sdk-desktop，Sprint 5）。
+ * 桌面管理 App 服务器。
  *
  * 本地 Web UI：只绑 127.0.0.1，不暴露局域网。
  * Electron 壳在发布版直接包裹本服务（同一前端代码零改动）。
@@ -122,6 +121,22 @@ async function readBody(req) {
   return JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}");
 }
 
+function validAgentId(id) {
+  if (!id || id.length > 64) return false;
+  for (const ch of id) {
+    const code = ch.charCodeAt(0);
+    const ok =
+      (code >= 48 && code <= 57) ||
+      (code >= 65 && code <= 90) ||
+      (code >= 97 && code <= 122) ||
+      ch === "." ||
+      ch === "_" ||
+      ch === "-";
+    if (!ok) return false;
+  }
+  return true;
+}
+
 export function createServer() {
   return http.createServer(async (req, res) => {
     const url = new URL(req.url ?? "/", `http://${HOST}:${PORT}`);
@@ -215,6 +230,35 @@ export function createServer() {
       if (url.pathname === "/api/agents" && req.method === "GET") {
         const agents = await readJson(path.join(mbHome(), "paired-agents.json"), []);
         return json(res, { items: agents });
+      }
+
+      if (url.pathname === "/api/agents" && req.method === "POST") {
+        const body = await readBody(req);
+        const agentId = String(body.agentId ?? "").trim();
+        const mask = body.permissionMask ?? 2;
+        if (!validAgentId(agentId)) {
+          return json(res, { error: "agentId must be 1-64 letters, digits, dot, underscore, or hyphen" }, 400);
+        }
+        if (typeof mask !== "number" || mask < 0 || mask > 4) {
+          return json(res, { error: "mask must be 0-4" }, 400);
+        }
+        const file = path.join(mbHome(), "paired-agents.json");
+        const agents = await readJson(file, []);
+        if (agents.some((a) => a.agentId === agentId)) {
+          return json(res, { error: "agent already exists" }, 409);
+        }
+        const keys = sdk.generateAgentKeyPair();
+        const agent = {
+          agentId,
+          agentPublicKeyB64: sdk.toBase64(keys.publicKey),
+          permissionMask: mask,
+          status: "active",
+        };
+        keys.secretKey.fill(0);
+        agents.push(agent);
+        await writeJson(file, agents);
+        await audit("agent.add", { agentId, permissionMask: mask });
+        return json(res, { ok: true, item: agent }, 201);
       }
 
       // —— 调整权限掩码：必须打到自托管节点，禁止只改本地 json ——

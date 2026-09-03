@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>记忆骨干 · 管理台</title>
+<title>memgrant · 授权</title>
 <style>
   :root {
     --bg: #fafaf8; --surface: #ffffff; --border: #e4e2da;
@@ -37,21 +37,41 @@
   .card dd { font-size: 14px; }
   .muted { color: var(--muted); font-size: 12px; }
   select { border: 1px solid var(--border); border-radius: 6px; padding: 2px 6px; }
+  .hint { max-width: 640px; margin-bottom: 16px; padding: 12px 14px; background: var(--accent-bg); border-radius: 8px; font-size: 13px; }
+  .hint strong { font-weight: 600; }
+  .add { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+  .add input { border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; font-size: 13px; width: 180px; }
+  .empty { color: var(--muted); padding: 24px 8px; }
 </style>
 </head>
 <body>
 <header>
-  <h1>记忆骨干 · 管理台</h1>
+  <h1>memgrant</h1>
   <span class="badge" id="keyBadge">加载中…</span>
 </header>
 <nav>
-  <button data-tab="memories" class="active">记忆</button>
-  <button data-tab="agents">Agent 权限</button>
+  <button data-tab="agents" class="active">Agent 授权</button>
+  <button data-tab="memories">记忆</button>
   <button data-tab="keys">密钥</button>
   <button data-tab="audit">审计</button>
 </nav>
 <main>
-  <section id="memories" class="panel active">
+  <section id="agents" class="panel active">
+    <p class="hint">每个 Agent 只能解开你授权的级别。掩码是最高可读级别：L2 读不了 L4。撤销会删除云端 grant，此后新拉取的密文不可解。本机已缓存的明文无法远程擦除。</p>
+    <div class="add">
+      <input id="newAgentId" placeholder="Agent ID，如 gemini-cli" maxlength="64">
+      <select id="newAgentMask">
+        <option value="1">L1 公开</option>
+        <option value="2" selected>L2 偏好</option>
+        <option value="3">L3 工作</option>
+        <option value="4">L4 敏感</option>
+      </select>
+      <button class="btn primary" onclick="addAgent()">添加 Agent</button>
+    </div>
+    <table><thead><tr><th>Agent</th><th>最高可读级别</th><th>状态</th><th>操作</th></tr></thead><tbody id="agentBody"></tbody></table>
+    <p class="muted" id="agentHint">init 会预置 cursor（MCP）与 claude-code（Hooks）。改掩码或撤销会打到同步节点并重算 grant。</p>
+  </section>
+  <section id="memories" class="panel">
     <div class="toolbar">
       <input id="q" placeholder="搜索记忆…" onkeydown="if(event.key==='Enter')loadMemories()">
       <button class="btn primary" onclick="loadMemories()">搜索</button>
@@ -59,10 +79,6 @@
     </div>
     <table><thead><tr><th>内容</th><th>类型</th><th>级别</th><th>来源</th><th>更新时间</th><th></th></tr></thead><tbody id="memBody"></tbody></table>
     <p class="muted" id="memCount"></p>
-  </section>
-  <section id="agents" class="panel">
-    <table><thead><tr><th>Agent</th><th>掩码（最高可读级别）</th><th>状态</th><th>操作</th></tr></thead><tbody id="agentBody"></tbody></table>
-    <p class="muted">掩码下调或撤销后，该 Agent 的授权凭据（grants）将被重算或删除——撤销 = 密码学上即时失效。</p>
   </section>
   <section id="keys" class="panel">
     <dl class="card" id="keyCard"></dl>
@@ -78,6 +94,7 @@ document.querySelectorAll("nav button").forEach((b) => b.onclick = () => {
   document.querySelectorAll("nav button").forEach((x) => x.classList.toggle("active", x === b));
   document.querySelectorAll(".panel").forEach((p) => p.classList.toggle("active", p.id === b.dataset.tab));
   if (b.dataset.tab === "agents") loadAgents();
+  if (b.dataset.tab === "memories") loadMemories();
   if (b.dataset.tab === "audit") loadAudit();
   if (b.dataset.tab === "keys") loadKeys();
 });
@@ -115,15 +132,40 @@ async function delMemory(id) {
 
 async function loadAgents() {
   const r = await (await fetch("/api/agents")).json();
-  $("agentBody").innerHTML = (r.items ?? []).map((a) => `
+  const items = r.items ?? [];
+  if (items.length === 0) {
+    $("agentBody").innerHTML = `<tr><td colspan="4" class="empty">还没有 Agent。添加一个 ID，写入时会为它生成 ECIES grant。</td></tr>`;
+    return;
+  }
+  $("agentBody").innerHTML = items.map((a) => `
     <tr>
       <td>${esc(a.agentId)}</td>
       <td><select onchange="setMask('${esc(a.agentId)}', this.value)" ${a.status !== "active" ? "disabled" : ""}>
         ${[0,1,2,3,4].map((l) => `<option value="${l}" ${l === a.permissionMask ? "selected" : ""}>L${l}</option>`).join("")}
       </select></td>
-      <td>${a.status === "active" ? "活跃" : "已撤销"}</td>
-      <td>${a.status === "active" ? `<button class="btn danger" onclick="revoke('${esc(a.agentId)}')">撤销</button>` : "—"}</td>
+      <td>${a.status === "active" ? "可解密授权范围" : "已撤销（新密文不可解）"}</td>
+      <td>${a.status === "active" ? `<button class="btn danger" onclick="revoke('${esc(a.agentId)}')">撤销授权</button>` : "—"}</td>
     </tr>`).join("");
+}
+async function addAgent() {
+  const agentId = $("newAgentId").value.trim();
+  const permissionMask = Number($("newAgentMask").value);
+  if (!agentId) {
+    alert("请填写 Agent ID");
+    return;
+  }
+  const r = await fetch("/api/agents", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ agentId, permissionMask }),
+  });
+  const body = await r.json();
+  if (!r.ok) {
+    alert(body.error ?? "添加失败");
+    return;
+  }
+  $("newAgentId").value = "";
+  loadAgents();
 }
 async function setMask(id, mask) {
   await fetch(`/api/agents/${encodeURIComponent(id)}/mask`, {
@@ -155,7 +197,7 @@ async function loadAudit() {
     <tr><td>${esc(a.ts.slice(0, 19).replace("T", " "))}</td><td>${esc(a.action)}</td><td>${esc(JSON.stringify(a.detail))}</td></tr>`).join("");
 }
 
-loadMemories(); loadKeys();
+loadAgents(); loadKeys();
 </script>
 </body>
 </html>

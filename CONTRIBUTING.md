@@ -13,7 +13,7 @@ node scripts/e2e-selfhost.mjs
 node scripts/revoke-demo.mjs
 ```
 
-需要本机同步节点时：`npm run dev:cloud`（`wrangler dev`，默认 `http://127.0.0.1:8787`），然后 `npm run setup`。
+需要本机同步节点时：`npm run init`（建表、注册、MCP）或已有环境时 `npm run dev:cloud`。
 
 ## 纪律
 

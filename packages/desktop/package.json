@@ -11,6 +11,10 @@
   "publishConfig": {
     "access": "public"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/smlayero/memgrant.git"
+  },
   "scripts": {
     "start": "node server.mjs",
     "test": "vitest run"

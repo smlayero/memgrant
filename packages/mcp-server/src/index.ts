@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * 记忆骨干 MCP Server（方案 §6.1 mcp-server/，Phase 1 显式接入阶段）。
+ * memgrant MCP Server：save / search / delete。
  *
  * 对任何 MCP 客户端（Claude Code / Cursor / 113+ 客户端）暴露三个工具：
  *   save_memory     显式保存（L0 规则 + 可选本机 L1，明文不出设备）
@@ -44,12 +44,13 @@ async function loadConfig(): Promise<Config> {
   const configPath = path.join(dir, "config.json");
   const raw = await fs.readFile(configPath, "utf8");
   const parsed = JSON.parse(raw) as Partial<Config>;
-  if (!parsed.endpoint || !parsed.agent_id) {
+  const agent_id = process.env.MB_AGENT_ID ?? parsed.agent_id;
+  if (!parsed.endpoint || !agent_id) {
     throw new Error(`config missing endpoint/agent_id: ${configPath}`);
   }
   const config: Config = {
     endpoint: parsed.endpoint.replace(/\/$/, ""),
-    agent_id: parsed.agent_id,
+    agent_id,
     cache: { dir: parsed.cache?.dir ?? dir },
   };
   if (parsed.device_token) config.device_token = parsed.device_token;

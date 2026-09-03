@@ -56,50 +56,14 @@ one wrapped DEK per granted agent
 ```bash
 npm install
 npm run build
-npm test
-node scripts/smoke.mjs
-
-npm run dev:cloud          # wrangler dev → http://127.0.0.1:8787
+npm run init
 ```
 
-Local D1 starts empty. Create tables on first run (or after deleting `.wrangler`):
+`init` creates local D1 tables, registers the first device, seeds `cursor` / `claude-code` grants, and writes Cursor MCP. Keep `npm run dev:cloud` running (init starts it if port 8787 is empty). Copy the mnemonic when it is printed.
 
-```bash
-cd packages/cloud
-npx wrangler d1 execute memory-backbone --local --file=./schema.sql
-cd ../..
-npm run setup              # writes ~/.memory-backbone/config.json and registers the first device
-```
+Then reload MCP in Cursor. Desktop console (grant matrix first): `npm run desktop` → http://127.0.0.1:4787.
 
-MCP (Claude Code, Cursor, and others):
-
-```json
-{
-  "mcpServers": {
-    "memgrant": {
-      "command": "node",
-      "args": ["path/to/packages/mcp-server/dist/index.js"]
-    }
-  }
-}
-```
-
-Desktop console: `npm run desktop` (binds only `127.0.0.1`). Use **Pull from cloud** to apply ciphertext from your sync node onto this device.
-
-Extra devices: **preferred** — `node scripts/cli.mjs recover <user_id> "<mnemonic>"` on the new machine.
-
-Pairing codes (`pair` / `join`) are a convenience. SPAKE2 has not had a third-party protocol audit.
-
-Deploy to your own Cloudflare account: [docs/self-host.md](docs/self-host.md) or `npm run deploy:cf`.
-
-One-shot client install (Cursor MCP + Claude Code hooks):
-
-```bash
-npm run build
-npm run clients
-```
-
-Then reload MCP in Cursor.
+Extra devices: `node scripts/cli.mjs recover <user_id> "<mnemonic>"`. Pairing codes are a convenience; SPAKE2 is unaudited. Your own Cloudflare account: [docs/self-host.md](docs/self-host.md) or `npm run deploy:cf`.
 
 ## Optional local model for judging
 

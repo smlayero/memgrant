@@ -1,4 +1,4 @@
--- 跨 Agent 记忆骨干 · D1 schema（技术方案 v2 §3.1/§3.2）
+-- memgrant D1 schema：只存密文引用、grant 与最少元数据，绝无内容明文。
 -- 云端零知识：本库只存密文引用、加密密钥材料与最少元数据，绝无内容明文。
 
 CREATE TABLE IF NOT EXISTS users (

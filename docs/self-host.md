@@ -7,32 +7,20 @@
 ```bash
 npm install
 npm run build
-npm run dev:cloud
+npm run init
 ```
 
-`wrangler dev` 监听 `http://127.0.0.1:8787`，D1/R2/KV/DO 都是本地模拟，**不需要** Cloudflare 账号。
+`init` 会：
 
-本地 D1 默认是空库，首次（或清掉 `.wrangler` 之后）要建表，否则 `setup` 会失败：
+1. 写入本地 D1 schema（不必再手跑 `wrangler d1 execute`）
+2. 若 `127.0.0.1:8787` 空闲则拉起 `wrangler dev`（不需要 Cloudflare 账号）
+3. 生成助记词、注册首设备（已有 `config.json` 则跳过）
+4. 预置 `cursor` / `claude-code` 两个授权目标
+5. 写入 Cursor MCP 与 Claude Code hooks
 
-```bash
-cd packages/cloud
-npx wrangler d1 execute memory-backbone --local --file=./schema.sql
-```
+管理台默认打开 **Agent 授权**：`npm run desktop` → http://127.0.0.1:4787。
 
-另开终端：
-
-```bash
-npm run setup
-```
-
-会：
-
-1. 生成助记词（只打印一次，请抄到离线位置）
-2. 把 MK 写入平台 Keychain（失败则 0600 文件，并警告）
-3. 向本机节点注册首设备
-4. 写入 `~/.memory-backbone/config.json`（可用 `MB_HOME` 改目录）
-
-然后启动 MCP 或 `npm run desktop`。
+单独步骤仍可用：`npm run setup`、`npm run clients`。
 
 ## 部署到自己的 Cloudflare 账号
 

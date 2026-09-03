@@ -25,6 +25,7 @@
     "test": "npm run test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "dev:cloud": "npm run dev --workspace @memgrant/cloud",
+    "init": "node scripts/bootstrap.mjs",
     "setup": "node scripts/setup.mjs",
     "clients": "node scripts/install-clients.mjs",
     "deploy:cf": "node scripts/deploy-cloudflare.mjs",

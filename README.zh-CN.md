@@ -56,50 +56,14 @@ DEK（每条记忆随机，AES-256-GCM）
 ```bash
 npm install
 npm run build
-npm test
-node scripts/smoke.mjs
-
-npm run dev:cloud          # wrangler dev → http://127.0.0.1:8787
+npm run init
 ```
 
-本地 D1 默认是空库，第一次（或清掉 `.wrangler` 之后）要建表：
+`init` 会建本地 D1 表、注册首设备、预置 `cursor` / `claude-code` 授权，并写入 Cursor MCP。同步节点需保持 `npm run dev:cloud`（若 8787 空闲，init 会自己拉起）。助记词只打印一次，请离线抄写。
 
-```bash
-cd packages/cloud
-npx wrangler d1 execute memory-backbone --local --file=./schema.sql
-cd ../..
-npm run setup              # 写入 ~/.memory-backbone/config.json 并注册首设备
-```
+然后在 Cursor 里重载 MCP。管理台默认打开授权页：`npm run desktop` → http://127.0.0.1:4787。
 
-MCP（Claude Code / Cursor 等）：
-
-```json
-{
-  "mcpServers": {
-    "memgrant": {
-      "command": "node",
-      "args": ["path/to/packages/mcp-server/dist/index.js"]
-    }
-  }
-}
-```
-
-管理台：`npm run desktop`（仅绑定 127.0.0.1）。点 **从云端拉同步** 会把节点上的密文解开写进本机缓存。
-
-多设备**主路径**：在新机器上 `node scripts/cli.mjs recover <user_id> "<mnemonic>"`。
-
-6 位配对码（`pair` / `join`）只是便利手段。SPAKE2 未经第三方协议审计。
-
-部署到自己的 Cloudflare 账号见 [docs/self-host.md](docs/self-host.md)，或 `npm run deploy:cf`。
-
-一键写入 Cursor MCP 与 Claude Code hooks：
-
-```bash
-npm run build
-npm run clients
-```
-
-然后在 Cursor 里重载 MCP。
+多设备主路径：`node scripts/cli.mjs recover <user_id> "<mnemonic>"`。6 位配对码只是便利手段，SPAKE2 未经第三方审计。部署到自己的 Cloudflare 账号见 [docs/self-host.md](docs/self-host.md)。
 
 ## 可选：用本机模型做判断
 

@@ -10,6 +10,9 @@ import { fileURLToPath } from "node:url";
 const sdk = await import(
   new URL("../packages/sdk-core/dist/index.js", import.meta.url).href
 );
+const { seedDefaultAgents } = await import(
+  new URL("./seed-agents.mjs", import.meta.url).href
+);
 
 function mbHome() {
   return process.env.MB_HOME ?? path.join(os.homedir(), ".memory-backbone");
@@ -18,6 +21,16 @@ function mbHome() {
 const endpoint = (process.env.MB_ENDPOINT ?? "http://127.0.0.1:8787").replace(/\/$/, "");
 const home = mbHome();
 await fs.mkdir(home, { recursive: true });
+
+const configPath = path.join(home, "config.json");
+try {
+  await fs.access(configPath);
+  await seedDefaultAgents(home, sdk);
+  console.log("已存在", configPath, "跳过注册。默认 Agent 已核对。");
+  process.exit(0);
+} catch {
+  /* first run */
+}
 
 const bundle = sdk.generateMnemonicBundle();
 const deviceKeys = sdk.generateAgentKeyPair();
@@ -53,12 +66,13 @@ const config = {
   cache: { dir: home },
   telemetry: { opt_in: false },
 };
-await fs.writeFile(path.join(home, "config.json"), JSON.stringify(config, null, 2), {
+await fs.writeFile(configPath, JSON.stringify(config, null, 2), {
   encoding: "utf8",
   mode: 0o600,
 });
+await seedDefaultAgents(home, sdk);
 
-console.log("已写入", path.join(home, "config.json"));
+console.log("已写入", configPath);
 console.log("user_id:", body.user_id);
 console.log("Keychain:", kc.id);
 console.log("");
@@ -67,8 +81,7 @@ console.log(bundle.mnemonic);
 console.log("");
 console.log("配对码（SPAKE2）只是多设备便利手段，未做第三方协议审计；丢设备请用上面的助记词 recover。");
 console.log("");
-console.log("下一步：npm run clients  （写入 Cursor MCP + Claude Code hooks）");
-console.log("或 npm run desktop");
+console.log("已写入默认 Agent：cursor（MCP）、claude-code（Hooks）。在管理台调整掩码或撤销。");
 
 bundle.mk.fill(0);
 deviceKeys.secretKey.fill(0);
