@@ -120,7 +120,20 @@ node scripts/revoke-demo.mjs     # revoke → 404
 
 ## npm packages
 
-After `npm login`, publish from the monorepo (cloud stays private / self-hosted):
+`0.1.0` is published. Install:
+
+```bash
+npm i @memgrant/sdk-core
+npx @memgrant/mcp-server
+npx @memgrant/desktop
+```
+
+- [@memgrant/sdk-core](https://www.npmjs.com/package/@memgrant/sdk-core)
+- [@memgrant/mcp-server](https://www.npmjs.com/package/@memgrant/mcp-server)
+- [@memgrant/adapters](https://www.npmjs.com/package/@memgrant/adapters)
+- [@memgrant/desktop](https://www.npmjs.com/package/@memgrant/desktop)
+
+`@memgrant/cloud` stays private / self-hosted. Do not republish the same version; bump first, then:
 
 ```bash
 npm publish -w @memgrant/sdk-core --access public

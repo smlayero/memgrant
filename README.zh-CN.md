@@ -118,7 +118,20 @@ node scripts/revoke-demo.mjs     # 撤销后 Agent 读取 404
 
 ## npm 包
 
-本机 `npm login` 之后可发布（cloud 保持 private，自己部署）：
+`0.1.0` 已发布。安装：
+
+```bash
+npm i @memgrant/sdk-core
+npx @memgrant/mcp-server
+npx @memgrant/desktop
+```
+
+- [@memgrant/sdk-core](https://www.npmjs.com/package/@memgrant/sdk-core)
+- [@memgrant/mcp-server](https://www.npmjs.com/package/@memgrant/mcp-server)
+- [@memgrant/adapters](https://www.npmjs.com/package/@memgrant/adapters)
+- [@memgrant/desktop](https://www.npmjs.com/package/@memgrant/desktop)
+
+`@memgrant/cloud` 不发布，自己部署。同一版本不能再发；升版本后才执行：
 
 ```bash
 npm publish -w @memgrant/sdk-core --access public
