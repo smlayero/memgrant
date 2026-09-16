@@ -140,8 +140,11 @@ describe("桌面管理 API", () => {
     expect(r.body.item.agentId).toBe("gemini-cli");
     expect(r.body.item.permissionMask).toBe(1);
     expect(r.body.item.agentPublicKeyB64.length).toBeGreaterThan(8);
+    expect(r.body.item.hasSecret).toBeUndefined();
     const list = await api("/api/agents");
-    expect(list.body.items.some((a) => a.agentId === "gemini-cli")).toBe(true);
+    const gemini = list.body.items.find((a) => a.agentId === "gemini-cli");
+    expect(gemini.hasSecret).toBe(true);
+    expect(list.body.items.some((a) => a.agentId === "claude-code" && a.hasSecret === false)).toBe(true);
   });
 
   it("重复 Agent ID 被拒绝", async () => {

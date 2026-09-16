@@ -8,6 +8,7 @@ export * from "./crypto/keychain.js";
 export * from "./crypto/platformKeychain.js";
 export * from "./crypto/deviceAuth.js";
 export * from "./crypto/deviceSk.js";
+export * from "./crypto/agentSk.js";
 export * from "./judge/rules.js";
 export * from "./judge/compose.js";
 export * from "./judge/openaiCompat.js";

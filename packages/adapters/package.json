@@ -1,13 +1,13 @@
 {
   "name": "@memgrant/adapters",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "license": "Apache-2.0",
   "type": "module",
-  "description": "Agent 适配层：Claude Code Hooks + 一键安装（npx @memgrant/adapters）",
+  "description": "写入 Cursor MCP（npx @memgrant/mcp-server）与 Claude Code hooks",
   "bin": {
-    "memgrant-setup": "./claude-code/setup.mjs"
+    "memgrant-setup": "./install.mjs"
   },
-  "files": ["claude-code"],
+  "files": ["claude-code", "install.mjs", "install-clients.mjs"],
   "publishConfig": {
     "access": "public"
   },
@@ -19,7 +19,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@memgrant/sdk-core": "0.1.0"
+    "@memgrant/sdk-core": "0.1.1"
   },
   "devDependencies": {
     "vitest": "^2.1.8"

@@ -9,7 +9,7 @@ Each agent decrypts only what it has been granted. This repository does not run 
 
 npm workspace name: `memgrant` (`@memgrant/*`)
 
-[VISION](VISION.md) · [SECURITY](SECURITY.md) · [Self-hosting](docs/self-host.md)
+[VISION](VISION.md) · [SECURITY](SECURITY.md) · [Protocol](docs/protocol.md) · [MCP clients](docs/mcp-clients.md) · [Self-hosting](docs/self-host.md)
 
 ## Why this exists
 
@@ -59,11 +59,20 @@ npm run build
 npm run init
 ```
 
-`init` creates local D1 tables, registers the first device, seeds `cursor` / `claude-code` grants, and writes Cursor MCP. Keep `npm run dev:cloud` running (init starts it if port 8787 is empty). Copy the mnemonic when it is printed.
+`init` creates local D1 tables, registers the first device, seeds `cursor` / `claude-code` grants, and writes Cursor MCP as `npx @memgrant/mcp-server` (not a path inside this clone). Keep `npm run dev:cloud` running (init starts it if port 8787 is empty). Copy the mnemonic when it is printed.
 
-Then reload MCP in Cursor. Desktop console (grant matrix first): `npm run desktop` → http://127.0.0.1:4787.
+Then reload MCP in Cursor. Desktop console (grant matrix first): `npm run desktop` or `npx @memgrant/desktop` → http://127.0.0.1:4787.
 
-Extra devices: `node scripts/cli.mjs recover <user_id> "<mnemonic>"`. Pairing codes are a convenience; SPAKE2 is unaudited. Your own Cloudflare account: [docs/self-host.md](docs/self-host.md) or `npm run deploy:cf`.
+If this machine already has `~/.memory-backbone/config.json` and a running sync node, you do not need the git clone:
+
+```bash
+npx @memgrant/adapters
+npx @memgrant/desktop
+```
+
+`adapters` writes Cursor MCP + Claude Code hooks. MCP and desktop both read that home-dir config (`MB_HOME` overrides it). To point MCP at a local `mcp-server` build instead of npm: `MB_MCP_LOCAL=1 npm run clients`.
+
+Extra devices: `node scripts/cli.mjs recover <user_id> "<mnemonic>"`. Pairing codes are **experimental** (SPAKE2, unaudited). Your own Cloudflare account: `npm run deploy:cf` after `npx wrangler login`, see [docs/self-host.md](docs/self-host.md). Other MCP apps: [docs/mcp-clients.md](docs/mcp-clients.md).
 
 ## Optional local model for judging
 
@@ -120,11 +129,10 @@ node scripts/revoke-demo.mjs     # revoke → 404
 
 ## npm packages
 
-`0.1.0` is published. Install:
+`0.1.1` is in this repo (publish after a fresh npm token). After a machine has `~/.memory-backbone/config.json`:
 
 ```bash
-npm i @memgrant/sdk-core
-npx @memgrant/mcp-server
+npx @memgrant/adapters
 npx @memgrant/desktop
 ```
 
@@ -148,4 +156,4 @@ npm publish -w @memgrant/desktop --access public
 
 ## Known limits
 
-SPAKE2 has not had a third-party protocol audit. If the platform keychain is unavailable, the implementation falls back to a file. Full list: [SECURITY.md](SECURITY.md).
+SPAKE2 pairing is **experimental** and has not had a third-party protocol audit. If the platform keychain is unavailable, the implementation falls back to a file. Full list: [SECURITY.md](SECURITY.md). Wire format: [docs/protocol.md](docs/protocol.md).

@@ -79,7 +79,7 @@ console.log("");
 console.log("助记词（只显示一次，请离线抄写；这是恢复主密钥的唯一主路径）：");
 console.log(bundle.mnemonic);
 console.log("");
-console.log("配对码（SPAKE2）只是多设备便利手段，未做第三方协议审计；丢设备请用上面的助记词 recover。");
+console.log("配对码（SPAKE2，实验路径）只是多设备便利手段，未做第三方协议审计；丢设备请用上面的助记词 recover。");
 console.log("");
 console.log("已写入默认 Agent：cursor（MCP）、claude-code（Hooks）。在管理台调整掩码或撤销。");
 

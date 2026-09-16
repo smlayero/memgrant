@@ -9,7 +9,7 @@
 
 npm 工作区名：`memgrant`（`@memgrant/*`）
 
-[愿景](VISION.md) · [安全](SECURITY.md) · [自托管](docs/self-host.md)
+[愿景](VISION.md) · [安全](SECURITY.md) · [协议](docs/protocol.md) · [MCP 客户端](docs/mcp-clients.md) · [自托管](docs/self-host.md)
 
 ## 项目初衷
 
@@ -59,11 +59,20 @@ npm run build
 npm run init
 ```
 
-`init` 会建本地 D1 表、注册首设备、预置 `cursor` / `claude-code` 授权，并写入 Cursor MCP。同步节点需保持 `npm run dev:cloud`（若 8787 空闲，init 会自己拉起）。助记词只打印一次，请离线抄写。
+`init` 会建本地 D1 表、注册首设备、预置 `cursor` / `claude-code` 授权，并把 Cursor MCP 写成 `npx @memgrant/mcp-server`（不写死本仓库路径）。同步节点需保持 `npm run dev:cloud`（若 8787 空闲，init 会自己拉起）。助记词只打印一次，请离线抄写。
 
-然后在 Cursor 里重载 MCP。管理台默认打开授权页：`npm run desktop` → http://127.0.0.1:4787。
+然后在 Cursor 里重载 MCP。管理台默认打开授权页：`npm run desktop` 或 `npx @memgrant/desktop` → http://127.0.0.1:4787。
 
-多设备主路径：`node scripts/cli.mjs recover <user_id> "<mnemonic>"`。6 位配对码只是便利手段，SPAKE2 未经第三方审计。部署到自己的 Cloudflare 账号见 [docs/self-host.md](docs/self-host.md)。
+本机已有 `~/.memory-backbone/config.json` 和正在跑的同步节点时，不必再 clone：
+
+```bash
+npx @memgrant/adapters
+npx @memgrant/desktop
+```
+
+`adapters` 会写 Cursor MCP 和 Claude Code hooks。MCP 与管理台都读这份家目录配置（可用 `MB_HOME` 覆盖）。本地开发要让 MCP 走仓库里的 `mcp-server`：`MB_MCP_LOCAL=1 npm run clients`。
+
+多设备主路径：`node scripts/cli.mjs recover <user_id> "<mnemonic>"`。6 位配对码是**实验路径**（SPAKE2，未经第三方审计）。部署到自己的 Cloudflare 账号：登录后 `npm run deploy:cf`，见 [docs/self-host.md](docs/self-host.md)。其他 MCP 客户端：[docs/mcp-clients.md](docs/mcp-clients.md)。
 
 ## 可选：用本机模型做判断
 
@@ -118,11 +127,10 @@ node scripts/revoke-demo.mjs     # 撤销后 Agent 读取 404
 
 ## npm 包
 
-`0.1.0` 已发布。安装：
+`0.1.1` 在本仓库（发 npm 需新 token）。本机已有 `~/.memory-backbone/config.json` 时：
 
 ```bash
-npm i @memgrant/sdk-core
-npx @memgrant/mcp-server
+npx @memgrant/adapters
 npx @memgrant/desktop
 ```
 
@@ -146,4 +154,4 @@ npm publish -w @memgrant/desktop --access public
 
 ## 已知限制
 
-SPAKE2 未经第三方协议审计；平台 Keychain 不可用时降级为文件。完整列表见 [SECURITY.md](SECURITY.md)。
+SPAKE2 是**实验路径**，未经第三方协议审计；平台 Keychain 不可用时降级为文件。完整列表见 [SECURITY.md](SECURITY.md)。线协议见 [docs/protocol.md](docs/protocol.md)。

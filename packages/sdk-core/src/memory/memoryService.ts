@@ -176,6 +176,25 @@ export class MemoryService {
     }
   }
 
+  /**
+   * Agent 视角检索：必须是活跃授权，且只返回 permissionLevel ≤ mask 的条目。
+   * 本机缓存仍是用户设备明文；撤销后已缓存条目可能还在，这是已知限制。
+   */
+  static searchAsAgent(
+    store: LocalStore,
+    access: AgentAccess | undefined,
+    queryText: string,
+    queryVector: Float32Array | null,
+    limit = 10,
+  ): LocalMemory[] {
+    if (!access || access.status !== "active") return [];
+    return store
+      .searchHybrid(queryText, queryVector, Math.max(limit * 4, limit))
+      .map((h) => h.memory)
+      .filter((m) => !m.deleted && m.permissionLevel <= access.permissionMask)
+      .slice(0, limit);
+  }
+
   /** 删除：本地标记 + 队列删除指令（云端删密文+wrapped_dek+全部 grants）。 */
   async deleteMemory(memoryId: string): Promise<void> {
     const now = new Date().toISOString();

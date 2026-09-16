@@ -19,6 +19,7 @@ import {
   createJudgeFromConfig,
   createEmbedderFromConfig,
   loadDeviceSk,
+  loadAgentSk,
   LocalStore,
   MemoryService,
   SyncClient,
@@ -42,11 +43,20 @@ async function loadConfig(): Promise<Config> {
   const dir =
     process.env.MB_HOME ?? path.join(home, ".memory-backbone");
   const configPath = path.join(dir, "config.json");
-  const raw = await fs.readFile(configPath, "utf8");
+  let raw: string;
+  try {
+    raw = await fs.readFile(configPath, "utf8");
+  } catch {
+    throw new Error(
+      `找不到 ${configPath}。MCP 只读本机配置，不依赖 git 仓库路径。请先 npm run init，或已有配置后执行 npx @memgrant/adapters；同步节点需在 config.endpoint 上运行。`,
+    );
+  }
   const parsed = JSON.parse(raw) as Partial<Config>;
   const agent_id = process.env.MB_AGENT_ID ?? parsed.agent_id;
   if (!parsed.endpoint || !agent_id) {
-    throw new Error(`config missing endpoint/agent_id: ${configPath}`);
+    throw new Error(
+      `${configPath} 缺少 endpoint/agent_id。MCP 用这份配置找本机同步节点，与是否 clone 仓库无关。`,
+    );
   }
   const config: Config = {
     endpoint: parsed.endpoint.replace(/\/$/, ""),
@@ -64,8 +74,7 @@ async function main(): Promise<void> {
   const config = await loadConfig();
   const keychain = createBestKeychain(config.cache.dir);
   const store = await LocalStore.open(path.join(config.cache.dir, "cache.db"));
-  // Phase 1：MCP 侧是"用户设备"角色，Agent 授权列表由桌面 App/配对流程维护；
-  // 本进程启动时从本地缓存目录读取已配对 Agent（paired-agents.json，由配对流程写入）。
+  // 写入仍走用户设备（MK + 为每个 Agent 封 grant）。检索按 MB_AGENT_ID 的私钥与掩码。
   let agents: AgentAccess[] = [];
   try {
     const raw = await fs.readFile(
@@ -110,7 +119,7 @@ async function main(): Promise<void> {
 
   const server = new McpServer({
     name: "memgrant",
-    version: "0.1.0",
+    version: "0.1.1",
   });
 
   // 打断 McpServer 链式注册的类型累积（TS2589 已知问题），用结构化注册器
@@ -157,7 +166,7 @@ async function main(): Promise<void> {
 
   reg.tool(
     "search_memories",
-    "检索长期记忆（本地优先）",
+    "检索本 Agent 被授权范围内的记忆（按掩码过滤；本机已缓存明文无法远程擦除）",
     {
       query: z.string().describe("检索关键词"),
       limit: z.number().int().min(1).max(50).optional(),
@@ -165,21 +174,41 @@ async function main(): Promise<void> {
     async (args) => {
       const query = String(args.query);
       const limit = typeof args.limit === "number" ? args.limit : 10;
-      const me = agents.find((a) => a.agentId === config.agent_id && a.status === "active");
-      const mask = me?.permissionMask ?? 2;
+      const me = agents.find((a) => a.agentId === config.agent_id);
+      if (!me || me.status !== "active") {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: me?.status === "revoked"
+                ? `Agent ${config.agent_id} 已撤销，不能再解新密文。本机已缓存明文无法远程擦除。`
+                : `未找到活跃 Agent「${config.agent_id}」。请在管理台添加，或把 MCP 的 MB_AGENT_ID 改成 paired-agents.json 里的 ID。`,
+            },
+          ],
+        };
+      }
+      const sk = await loadAgentSk(config.cache.dir, config.agent_id);
+      if (!sk) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Agent ${config.agent_id} 没有本机私钥。请在管理台删掉后重加，或重新 npm run init。`,
+            },
+          ],
+        };
+      }
+      sk.fill(0);
       const embedder = createEmbedderFromConfig(config.embedder);
-      let vec = null;
+      let vec: Float32Array | null = null;
       try {
         vec = await embedder.embed(query);
       } catch {
         vec = null;
       }
-      const hits = store
-        .searchHybrid(query, vec, limit)
-        .map((h) => h.memory)
-        .filter((h) => h.permissionLevel <= mask);
+      const hits = MemoryService.searchAsAgent(store, me, query, vec, limit);
       if (hits.length === 0) {
-        return { content: [{ type: "text" as const, text: "无匹配记忆" }] };
+        return { content: [{ type: "text" as const, text: "无匹配记忆（已按该 Agent 的授权掩码过滤）" }] };
       }
       const text = hits
         .map(
@@ -187,7 +216,14 @@ async function main(): Promise<void> {
             `${i + 1}. [${h.type}/L${h.permissionLevel}] ${h.plaintext}（${h.updatedAt}）`,
         )
         .join("\n");
-      return { content: [{ type: "text" as const, text }] };
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: `${text}\n\n（本机缓存明文，按 ${config.agent_id} 掩码 L${me.permissionMask} 过滤。撤销后已缓存条目可能仍在。）`,
+          },
+        ],
+      };
     },
   );
 

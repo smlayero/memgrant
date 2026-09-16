@@ -108,6 +108,64 @@ describe("S4: Agent 密码学隔离", () => {
     );
     expect(pt).toContain("pnpm");
   });
+
+  it("searchAsAgent 按掩码过滤；无私钥身份在调用方应拒绝检索", async () => {
+    const wide = generateAgentKeyPair();
+    const narrow = generateAgentKeyPair();
+    const agents: AgentAccess[] = [
+      {
+        agentId: "cursor",
+        agentPublicKey: wide.publicKey,
+        permissionMask: 2,
+        status: "active",
+      },
+      {
+        agentId: "notes",
+        agentPublicKey: narrow.publicKey,
+        permissionMask: 1,
+        status: "active",
+      },
+    ];
+    const { store, service } = await makeService(agents);
+    await service.saveMemory({
+      text: "我喜欢用 pnpm 管理依赖，以后都用它",
+      explicit: true,
+    });
+    await service.saveMemory({
+      text: "公开主页是 example.com",
+      explicit: true,
+    });
+
+    const asCursor = MemoryService.searchAsAgent(
+      store,
+      agents[0],
+      "pnpm",
+      null,
+      10,
+    );
+    expect(asCursor.some((m) => m.plaintext.includes("pnpm"))).toBe(true);
+
+    const asNotes = MemoryService.searchAsAgent(
+      store,
+      agents[1],
+      "pnpm",
+      null,
+      10,
+    );
+    expect(asNotes.some((m) => m.plaintext.includes("pnpm"))).toBe(false);
+
+    const revoked = MemoryService.searchAsAgent(
+      store,
+      { ...agents[0], status: "revoked" },
+      "pnpm",
+      null,
+      10,
+    );
+    expect(revoked).toHaveLength(0);
+
+    wide.secretKey.fill(0);
+    narrow.secretKey.fill(0);
+  });
 });
 
 describe("S5: 撤销即密码学失效", () => {

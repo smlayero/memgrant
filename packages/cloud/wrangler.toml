@@ -3,7 +3,7 @@ main = "src/index.ts"
 compatibility_date = "2026-07-01"
 
 # wrangler dev 使用本地模拟的 D1/R2/KV，不必先创建云资源。
-# 部署到自己的 Cloudflare 账号时，用 wrangler d1/kv/r2 create 得到的真实 id 替换占位符。
+# 部署到自己的 Cloudflare 账号时，优先 npm run deploy:cf（创建 D1/KV/R2 并回写 id）。
 # 详见 docs/self-host.md
 
 [dev]

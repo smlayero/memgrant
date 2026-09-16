@@ -16,27 +16,42 @@ npm run init
 2. 若 `127.0.0.1:8787` 空闲则拉起 `wrangler dev`（不需要 Cloudflare 账号）
 3. 生成助记词、注册首设备（已有 `config.json` 则跳过）
 4. 预置 `cursor` / `claude-code` 两个授权目标
-5. 写入 Cursor MCP 与 Claude Code hooks
+5. 写入 Cursor MCP（`npx @memgrant/mcp-server`）与 Claude Code hooks
 
-管理台默认打开 **Agent 授权**：`npm run desktop` → http://127.0.0.1:4787。
+管理台默认打开 **Agent 授权**：`npm run desktop` 或 `npx @memgrant/desktop` → http://127.0.0.1:4787。
 
 单独步骤仍可用：`npm run setup`、`npm run clients`。
 
-## 部署到自己的 Cloudflare 账号
-
-免费额度通常够个人使用。
+已有本机配置、只想让 Cursor 接上（不必仓库路径）：
 
 ```bash
-cd packages/cloud
+npx @memgrant/adapters
+```
+
+MCP 与 desktop 读取 `~/.memory-backbone/config.json`。本地改 MCP 源码时用 `MB_MCP_LOCAL=1 npm run clients`。
+
+## 部署到自己的 Cloudflare 账号
+
+免费额度通常够个人使用。登录后一条命令创建 D1/KV/R2、回写 `wrangler.toml`、建表并 deploy：
+
+```bash
 npx wrangler login
-npx wrangler d1 create memory-backbone          # 把 database_id 写入 wrangler.toml
-npx wrangler kv namespace create SESSIONS       # 把 id 写入 wrangler.toml
-npx wrangler r2 bucket create memory-backbone-vault
-npx wrangler d1 execute memory-backbone --remote --file=./schema.sql
-npx wrangler deploy
+npm run deploy:cf
 ```
 
 把 MCP / setup 的 `endpoint` 改成你的 `https://<name>.<account>.workers.dev`。
+
+若自动创建失败，仍可手工：
+
+```bash
+cd packages/cloud
+npx wrangler d1 create memory-backbone
+npx wrangler kv namespace create SESSIONS
+npx wrangler r2 bucket create memory-backbone-vault
+# 把返回的 id 写入 wrangler.toml
+npx wrangler d1 execute memory-backbone --remote --file=./schema.sql
+npx wrangler deploy
+```
 
 已有本地 D1 若缺 `recovery_verifier` 列：
 
@@ -74,4 +89,4 @@ node scripts/cli.mjs pair
 node scripts/cli.mjs join 123456
 ```
 
-SPAKE2 未经第三方协议审计；不要把它当成比助记词更可信的主路径。
+SPAKE2 是实验路径，未经第三方协议审计；不要把它当成比助记词更可信的主路径。线协议见 [protocol.md](protocol.md)。任意 MCP 客户端见 [mcp-clients.md](mcp-clients.md)。

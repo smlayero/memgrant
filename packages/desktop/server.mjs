@@ -122,19 +122,7 @@ async function readBody(req) {
 }
 
 function validAgentId(id) {
-  if (!id || id.length > 64) return false;
-  for (const ch of id) {
-    const code = ch.charCodeAt(0);
-    const ok =
-      (code >= 48 && code <= 57) ||
-      (code >= 65 && code <= 90) ||
-      (code >= 97 && code <= 122) ||
-      ch === "." ||
-      ch === "_" ||
-      ch === "-";
-    if (!ok) return false;
-  }
-  return true;
+  return sdk.validAgentId(id);
 }
 
 export function createServer() {
@@ -229,7 +217,14 @@ export function createServer() {
       // —— Agent 权限列表 ——
       if (url.pathname === "/api/agents" && req.method === "GET") {
         const agents = await readJson(path.join(mbHome(), "paired-agents.json"), []);
-        return json(res, { items: agents });
+        const items = [];
+        for (const a of agents) {
+          items.push({
+            ...a,
+            hasSecret: Boolean(await sdk.loadAgentSk(mbHome(), a.agentId)),
+          });
+        }
+        return json(res, { items });
       }
 
       if (url.pathname === "/api/agents" && req.method === "POST") {
@@ -248,6 +243,7 @@ export function createServer() {
           return json(res, { error: "agent already exists" }, 409);
         }
         const keys = sdk.generateAgentKeyPair();
+        await sdk.saveAgentSk(mbHome(), agentId, keys.secretKey);
         const agent = {
           agentId,
           agentPublicKeyB64: sdk.toBase64(keys.publicKey),
@@ -363,7 +359,15 @@ export function createServer() {
 const isMain =
   process.argv[1] && import.meta.url.endsWith(path.basename(process.argv[1]));
 if (isMain) {
-  createServer().listen(PORT, HOST, () => {
+  createServer().listen(PORT, HOST, async () => {
     console.log(`memgrant 桌面管理: http://${HOST}:${PORT}`);
+    const config = await loadConfigFile();
+    if (!config.endpoint) {
+      console.log(
+        `未找到 ${path.join(mbHome(), "config.json")} 里的 endpoint。管理台和 MCP 都读这份本机配置，不依赖仓库路径。请先 npm run init。`,
+      );
+    } else {
+      console.log(`同步节点: ${config.endpoint}`);
+    }
   });
 }

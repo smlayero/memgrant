@@ -57,7 +57,7 @@
 </nav>
 <main>
   <section id="agents" class="panel active">
-    <p class="hint">每个 Agent 只能解开你授权的级别。掩码是最高可读级别：L2 读不了 L4。撤销会删除云端 grant，此后新拉取的密文不可解。本机已缓存的明文无法远程擦除。</p>
+    <p class="hint">每个 Agent 有自己的私钥（本机 0600 文件，不上云）。掩码是最高可读级别：L2 读不了 L4。撤销会删除云端 grant，此后新拉取的密文不可解。<strong>本机已缓存的明文无法远程擦除。</strong></p>
     <div class="add">
       <input id="newAgentId" placeholder="Agent ID，如 gemini-cli" maxlength="64">
       <select id="newAgentMask">
@@ -68,8 +68,8 @@
       </select>
       <button class="btn primary" onclick="addAgent()">添加 Agent</button>
     </div>
-    <table><thead><tr><th>Agent</th><th>最高可读级别</th><th>状态</th><th>操作</th></tr></thead><tbody id="agentBody"></tbody></table>
-    <p class="muted" id="agentHint">init 会预置 cursor（MCP）与 claude-code（Hooks）。改掩码或撤销会打到同步节点并重算 grant。</p>
+    <table><thead><tr><th>Agent</th><th>最高可读级别</th><th>私钥</th><th>状态</th><th>操作</th></tr></thead><tbody id="agentBody"></tbody></table>
+    <p class="muted" id="agentHint">init 会预置 cursor（MCP）与 claude-code（Hooks）。MCP 用 MB_AGENT_ID 对应这份身份。无私钥则无法按该 Agent 检索。</p>
   </section>
   <section id="memories" class="panel">
     <div class="toolbar">
@@ -134,7 +134,7 @@ async function loadAgents() {
   const r = await (await fetch("/api/agents")).json();
   const items = r.items ?? [];
   if (items.length === 0) {
-    $("agentBody").innerHTML = `<tr><td colspan="4" class="empty">还没有 Agent。添加一个 ID，写入时会为它生成 ECIES grant。</td></tr>`;
+    $("agentBody").innerHTML = `<tr><td colspan="5" class="empty">还没有 Agent。添加一个 ID，写入时会为它生成 ECIES grant 并留下私钥。</td></tr>`;
     return;
   }
   $("agentBody").innerHTML = items.map((a) => `
@@ -143,6 +143,7 @@ async function loadAgents() {
       <td><select onchange="setMask('${esc(a.agentId)}', this.value)" ${a.status !== "active" ? "disabled" : ""}>
         ${[0,1,2,3,4].map((l) => `<option value="${l}" ${l === a.permissionMask ? "selected" : ""}>L${l}</option>`).join("")}
       </select></td>
+      <td>${a.hasSecret ? "本机已存" : "缺失（请删后重加）"}</td>
       <td>${a.status === "active" ? "可解密授权范围" : "已撤销（新密文不可解）"}</td>
       <td>${a.status === "active" ? `<button class="btn danger" onclick="revoke('${esc(a.agentId)}')">撤销授权</button>` : "—"}</td>
     </tr>`).join("");

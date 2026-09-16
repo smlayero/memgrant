@@ -13,7 +13,7 @@ node scripts/e2e-selfhost.mjs
 node scripts/revoke-demo.mjs
 ```
 
-需要本机同步节点时：`npm run init`（建表、注册、MCP）或已有环境时 `npm run dev:cloud`。
+需要本机同步节点时：`npm run init`（建表、注册、MCP）或已有环境时 `npm run dev:cloud`。`npm run clients` 默认把 Cursor MCP 写成 npx；改本地 mcp-server 时用 `MB_MCP_LOCAL=1 npm run clients`。
 
 ## 纪律
 

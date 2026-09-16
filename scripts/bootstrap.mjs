@@ -84,5 +84,6 @@ await run(process.execPath, [path.join(HERE, "install-clients.mjs")], ROOT);
 
 console.log("");
 console.log("首次安装完成。请抄写上面的助记词（若本次新生成）。");
-console.log("管理台（Agent 授权）：npm run desktop  →  http://127.0.0.1:4787");
+console.log("管理台（Agent 授权）：npm run desktop 或 npx @memgrant/desktop  →  http://127.0.0.1:4787");
+console.log("Cursor MCP 已写成 npx @memgrant/mcp-server，不依赖本仓库路径。");
 console.log("在 Cursor 里重载 MCP。同步节点需保持 npm run dev:cloud。");

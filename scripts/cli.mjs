@@ -33,6 +33,7 @@ async function writeConfig(config) {
 }
 
 async function cmdPair() {
+  console.log("SPAKE2 配对是实验路径，未经第三方协议审计。丢设备请用助记词 recover。");
   const config = await readConfig();
   const kc = sdk.createBestKeychain(mbHome());
   const mk = await kc.getMk();
